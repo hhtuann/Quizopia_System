@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Cơ sở dữ liệu chính: MySQL
+  mysql-db:
+    image: mysql:8.0
+    container_name: quizopia_mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: quizopia_db
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: quiz_user
+      MYSQL_PASSWORD: quiz_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - quizopia_network
+
+  # Bộ nhớ đệm & Hàng đợi: Redis
+  redis-cache:
+    image: redis:7.0-alpine
+    container_name: quizopia_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass redis_password
+    volumes:
+      - redis_data:/data
+    networks:
+      - quizopia_network
+
+# Định nghĩa Volumes để dữ liệu không bị mất khi tắt Docker
+volumes:
+  mysql_data:
+  redis_data:
+
+# Định nghĩa Network nội bộ cho các container giao tiếp
+networks:
+  quizopia_network:
+    driver: bridge
