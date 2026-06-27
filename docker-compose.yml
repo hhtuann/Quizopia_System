@@ -6,8 +6,8 @@ services:
 
     environment:
       POSTGRES_DB: quizopia_db
-      POSTGRES_USER: hhtuann
-      POSTGRES_PASSWORD: 216556
+      POSTGRES_USER: quiz_user
+      POSTGRES_PASSWORD: quiz_password
 
     ports:
       - "5432:5432"
@@ -40,9 +40,95 @@ services:
     networks:
       - quizopia_network
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: quizopia_backend
+    restart: unless-stopped
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/quizopia_db
+      SPRING_DATASOURCE_USERNAME: quiz_user
+      SPRING_DATASOURCE_PASSWORD: quiz_password
+      REDIS_HOST: redis-cache
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_password
+
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+
+    networks:
+      - quizopia_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: quizopia_frontend
+    restart: unless-stopped
+
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8080
+
+    ports:
+      - "3000:3000"
+
+    depends_on:
+      - backend
+
+    networks:
+      - quizopia_network
+
+  minio:
+    image: minio/minio:latest
+    container_name: quizopia_minio
+    restart: unless-stopped
+
+    command: server /data --console-address ":9001"
+
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+    volumes:
+      - minio_data:/data
+
+    networks:
+      - quizopia_network
+
+    healthcheck:
+      test: [ "CMD-SHELL", "mc ready local" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: quizopia_mailpit
+    restart: unless-stopped
+
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+    networks:
+      - quizopia_network
+
 volumes:
   postgres_data:
   redis_data:
+  minio_data:
 
 networks:
   quizopia_network:
