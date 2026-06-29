@@ -1,6 +1,6 @@
 [submodule "backend"]
 	path = backend
-	url = https://github.com/hhtuann/quizopia_backend.git
+	url = https://github.com/hhtuann/Quizopia_Backend.git
 [submodule "frontend"]
 	path = frontend
 	url = https://github.com/hhtuann/quizopia_frontend.git

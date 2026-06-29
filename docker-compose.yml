@@ -125,10 +125,33 @@ services:
     networks:
       - quizopia_network
 
+  backend-test:
+    image: maven:3.9-eclipse-temurin-21
+    profiles:
+      - test
+
+    working_dir: /workspace/backend
+
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+
+    volumes:
+      - ./backend:/workspace/backend
+      - maven_cache:/root/.m2
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    command:
+      - mvn
+      - test
+
+    networks:
+      - quizopia_network
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+  maven_cache:
 
 networks:
   quizopia_network:
