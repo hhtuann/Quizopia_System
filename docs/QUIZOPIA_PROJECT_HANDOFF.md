@@ -2,8 +2,8 @@
 
 > Mục đích của tài liệu này là giúp một phiên ChatGPT khác, một tài khoản khác, hoặc một thành viên mới có thể tiếp tục dự án Quizopia đúng luồng, không làm sai kiến trúc, không sửa nhầm migration đã áp dụng, và không phá vỡ cấu trúc Git submodule.
 >
-> Cập nhật lần cuối: 2026-06-28  
-> Trạng thái hiện tại: Hoàn tất checkpoint trước V3
+> Cập nhật lần cuối: 2026-06-29  
+> Trạng thái hiện tại: Hoàn tất Day 2 — Database đang ở Flyway version 3 (V3 đã áp dụng)
 
 ---
 
@@ -373,7 +373,7 @@ readinessState
 
 ---
 
-## Day 2 — Identity schema và JPA domain model
+## Day 2 — Identity schema, JPA domain model, permission catalog và V3 seed
 
 ### 6.6. Migration V2
 
@@ -399,6 +399,60 @@ refresh_sessions
 ```
 
 Tổng số bảng sau V2 gồm cả bảng hệ thống và metadata là 8.
+
+### 6.7. JPA domain model và Hibernate validation
+
+9 file entity đã được tạo trong:
+
+```text
+backend/src/main/java/com/hhtuann/backend/identity/domain/model
+```
+
+Chi tiết mapping và equality rules nằm ở mục 8.
+
+Hibernate `ddl-auto=validate` đã pass: entity mapping khớp đúng V2 schema.
+
+### 6.8. Permission catalog và role-permission matrix đã chốt
+
+`docs/security.md` đã được phê duyệt làm nguồn sự thật cho authorization model:
+
+- Đúng 4 role: `SYSTEM_ADMIN`, `ACADEMIC_ADMIN`, `TEACHER`, `STUDENT`.
+- Đúng 84 permission theo nhóm Identity & System, Academic, Question Bank, Exam, Attempt, Grading, Reporting.
+- Không còn role `PROCTOR` và không có permission `ATTEMPT_CANCEL`.
+- Role-permission matrix:
+  - `SYSTEM_ADMIN`: 13
+  - `ACADEMIC_ADMIN`: 51
+  - `TEACHER`: 46
+  - `STUDENT`: 9
+- Tổng 119 role-permission mapping.
+- `TEACHER` tự giám sát ca thi bằng `EXAM_SESSION_MONITOR`.
+
+### 6.9. Migration V3
+
+File:
+
+```text
+backend/src/main/resources/db/migration/V3__seed_roles_and_permissions.sql
+```
+
+V3 đã được Flyway áp dụng thành công và kiểm chứng trực tiếp trong PostgreSQL.
+
+Kết quả thực tế:
+
+- Flyway database version hiện là 3.
+- 4 role.
+- 84 permission.
+- 119 role-permission mapping.
+- Mapping count theo role đúng 13 / 51 / 46 / 9.
+- Không có `PROCTOR`, không có `ATTEMPT_CANCEL`.
+
+Migration V3 chứa khối validation `DO $$ ... $$` kiểm tra các bất biến trên bằng `code`, không dùng numeric ID. Nếu lệch bất kỳ con số nào, migration sẽ fail.
+
+Không được sửa V3 nữa.
+
+### 6.10. Test configuration
+
+`src/test/resources/application-test.yaml` đã được chuyển thành `application-test.properties` để nhất quán với runtime config (chi tiết ở mục 9).
 
 ---
 
@@ -476,15 +530,16 @@ updated_at
 - `code` phải theo định dạng uppercase
 - Dùng cho các role hệ thống
 
-Role mục tiêu:
+Role đã được seed tại V3, đúng 4 role:
 
 ```text
 SYSTEM_ADMIN
 ACADEMIC_ADMIN
 TEACHER
-PROCTOR
 STUDENT
 ```
+
+Không còn role `PROCTOR`. Giáo viên tự giám sát ca thi bằng permission `EXAM_SESSION_MONITOR`.
 
 Lưu ý quan trọng:
 
@@ -511,7 +566,7 @@ updated_at
 
 - `code` unique
 - `code` dùng uppercase convention
-- Permission catalog sẽ được seed ở V3 hoặc migration tiếp theo
+- Permission catalog đã được seed tại V3: đúng 84 permission, không có `ATTEMPT_CANCEL`
 
 ## 7.4. `user_roles`
 
@@ -723,9 +778,9 @@ RolePermissionId
 
 Backend đã khởi động thành công sau khi tạo entities.
 
-Log xác nhận:
+Log xác nhận (sau Day 2 / V3):
 
-- Flyway validate thành công 2 migration
+- Flyway validate thành công 3 migration (V1, V2, V3)
 - Hibernate EntityManagerFactory khởi tạo thành công
 - `ddl-auto=validate` không báo mismatch
 - Backend started
@@ -743,6 +798,8 @@ src/test/java/com/hhtuann/backend/QuizopiaBackendApplicationTests.java
 src/test/resources/application-test.properties
 ```
 
+Lưu ý: file test config trước đây là `application-test.yaml`, đã được chuyển thành `application-test.properties` (commit `58950e9`).
+
 Mục đích:
 
 - Tách test configuration khỏi runtime configuration
@@ -757,8 +814,16 @@ Cần kiểm tra nội dung thực tế trong repository trước khi mở rộn
 
 ## 10.1. Backend commit
 
+Commit hiện tại (HEAD):
+
 ```text
-c59e411 feat(identity): add Flyway schema and JPA models
+58950e9 feat(identity): change .yaml to .properties
+```
+
+Commit V3 trong lịch sử backend:
+
+```text
+173bac6 feat(identity): seed roles and permissions
 ```
 
 Remote state:
@@ -767,10 +832,14 @@ Remote state:
 backend/main == origin/main
 ```
 
+Đã push và đồng bộ với `origin/main`.
+
 ## 10.2. Root commit
 
+Commit hiện tại (HEAD):
+
 ```text
-8e13c57 docs: establish Quizopia foundation and architecture
+deaf887 chore(submodule): update backend revision
 ```
 
 Remote state:
@@ -779,6 +848,8 @@ Remote state:
 main == origin/main
 ```
 
+Đã push và đồng bộ với `origin/main`.
+
 ## 10.3. Local changes chưa commit
 
 Tại repository cha vẫn còn:
@@ -786,16 +857,18 @@ Tại repository cha vẫn còn:
 ```text
  m frontend
 ?? .claude/
+?? .gitignore
 ?? .vscode/
 ```
 
 Ý nghĩa:
 
-- `frontend` có thay đổi bên trong submodule nhưng chưa commit.
+- `frontend` có thay đổi local chưa commit.
 - `.claude/` chưa tracked.
+- `.gitignore` chưa tracked.
 - `.vscode/` chưa tracked.
 
-Không được tự ý stage hoặc commit ba mục này khi đang tiếp tục backend V3.
+Không được tự ý stage hoặc commit các mục này.
 
 ---
 
@@ -836,7 +909,7 @@ Bài học:
 
 ---
 
-# 12. Trạng thái hiện tại trước V3
+# 12. Trạng thái hiện tại (Day 2 hoàn tất)
 
 Đã hoàn thành:
 
@@ -848,97 +921,41 @@ Bài học:
 - Flyway integration
 - V1 metadata migration
 - V2 identity schema
-- Identity JPA entities
+- Identity JPA entities (9 file)
 - Hibernate schema validation
-- Backend Git commit và push
-- Root documentation commit và push
+- Permission catalog và role-permission matrix đã chốt tại `docs/security.md`
+- V3 seed roles & permissions đã áp dụng và kiểm chứng trực tiếp trong PostgreSQL
+- Backend và root đã commit và push, đồng bộ với `origin/main`
 
-Chưa bắt đầu:
+Flyway database hiện ở version 3. V1, V2, V3 đều đã áp dụng và không được sửa nữa.
 
-```text
-V3__seed_roles_and_permissions.sql
-```
-
-Đây là bước tiếp theo.
+Bước tiếp theo là Day 3 — Identity Repository Layer (chỉ là kế hoạch, chưa triển khai).
 
 ---
 
-# 13. Kế hoạch chi tiết từ V3 trở đi
+# 13. Kế hoạch tiếp theo (từ Day 3)
 
 Phần dưới là kế hoạch đề xuất để tiếp tục theo đúng kiến trúc hiện tại. Các bước phải được thực hiện tuần tự và kiểm chứng sau mỗi phần.
 
-## Phase 3 — Seed roles và permissions
+## Phase 3 — Seed roles và permissions (ĐÃ HOÀN THÀNH)
 
-### Mục tiêu
+Đã hoàn thành trong Day 2:
 
-Tạo migration:
+- Migration `V3__seed_roles_and_permissions.sql` đã áp dụng (mục 6.9).
+- Đúng 4 role (không `PROCTOR`), đúng 84 permission (không `ATTEMPT_CANCEL`).
+- Mapping 13 / 51 / 46 / 9 (tổng 119).
+- Flyway database version hiện là 3.
+- V3 có khối validation `DO $$ ... $$` kiểm tra các bất biến bằng `code`.
 
-```text
-V3__seed_roles_and_permissions.sql
-```
+Không sửa lại V3.
 
-### Nội dung dự kiến
+## Day 3 — Identity Repository Layer (KẾ HOẠCH, chưa triển khai)
 
-Seed 5 role:
+### Bước đầu Day 3
 
-```text
-SYSTEM_ADMIN
-ACADEMIC_ADMIN
-TEACHER
-PROCTOR
-STUDENT
-```
+Rà soát lại 9 entity trong `backend/src/main/java/com/hhtuann/backend/identity/domain/model` và xác định query thực sự cần thiết trước khi tạo repository. Không tạo repository trước khi rõ query cần gì.
 
-Tạo permission catalog theo domain.
-
-Các nhóm permission nên xem xét:
-
-```text
-USER_*
-ROLE_*
-COURSE_*
-CLASS_*
-QUESTION_*
-QUESTION_BANK_*
-EXAM_*
-EXAM_SESSION_*
-PROCTORING_*
-SUBMISSION_*
-RESULT_*
-REPORT_*
-SYSTEM_*
-```
-
-Không nên tự bịa permission code ngay lập tức.
-
-Trước khi viết V3 cần đọc:
-
-```text
-docs/security.md
-docs/api.md
-docs/architecture.md
-docs/database.md
-```
-
-Yêu cầu V3:
-
-- Dữ liệu seed phải deterministic.
-- Không hard-code numeric ID nếu có thể tránh.
-- Dùng role/permission code làm natural key.
-- Phân quyền phải explicit.
-- Không cấp mọi academic permission cho SYSTEM_ADMIN chỉ vì tên role.
-- Migration phải có comment rõ ràng.
-- Sau khi áp dụng V3, không sửa lại V3.
-
-### Kiểm chứng
-
-- Flyway database version tăng lên 3.
-- Các role tồn tại đúng 5 bản ghi.
-- Permission không bị duplicate.
-- Role-permission mapping đúng thiết kế.
-- Backend vẫn start và Hibernate validate thành công.
-
-## Phase 4 — Repository layer cho Identity
+### Kế hoạch repository (sau khi rà soát)
 
 Tạo repository:
 
@@ -1119,7 +1136,7 @@ Authorization phải kết hợp:
 Ví dụ:
 
 - TEACHER không được sửa exam của teacher khác nếu không có assignment.
-- PROCTOR chỉ được truy cập session được phân công.
+- TEACHER chỉ được monitor session thuộc sở hữu/assignment hợp lệ (qua `EXAM_SESSION_MONITOR`); không còn role `PROCTOR`.
 - STUDENT chỉ được thi exam mà mình được enroll và trong thời gian cho phép.
 - SYSTEM_ADMIN không tự động được sửa nội dung học thuật nếu không có permission tương ứng.
 
@@ -1297,18 +1314,17 @@ Ctrl + C
    - kiểm tra backend start
    - kiểm tra Hibernate validate
 
-Đã khóa:
+Đã khóa (đã áp dụng, không sửa):
 
 ```text
 V1__initialize_database.sql
 V2__create_identity_schema.sql
-```
-
-Bước tiếp theo phải là:
-
-```text
 V3__seed_roles_and_permissions.sql
 ```
+
+Flyway database hiện ở version 3.
+
+Migration tiếp theo (nếu cần schema mới) phải là V4 trở đi, không sửa V1/V2/V3.
 
 ---
 
@@ -1375,13 +1391,13 @@ docker compose ps
 
 Sau đó kiểm tra:
 
-- Root đang ở commit `8e13c57` hoặc commit mới hơn hợp lệ.
-- Backend đang ở `c59e411` hoặc commit mới hơn hợp lệ.
+- Root đang ở commit `deaf887` hoặc commit mới hơn hợp lệ.
+- Backend đang ở `58950e9` hoặc commit mới hơn hợp lệ.
 - Không có thay đổi backend chưa rõ nguồn gốc.
 - Frontend vẫn có thể hiện `m frontend`.
-- `.claude/` và `.vscode/` vẫn có thể untracked.
+- `.claude/`, `.gitignore` và `.vscode/` vẫn có thể untracked.
 - Docker services ở trạng thái hợp lý.
-- Flyway database hiện ở version 2 trước khi chạy V3.
+- Flyway database hiện ở version 3.
 
 Không nên giả định repository vẫn đúng trạng thái nếu chưa kiểm tra các lệnh trên.
 
@@ -1405,8 +1421,8 @@ Yêu cầu làm việc:
 - Backend và frontend là Git submodule.
 - Dự án chạy 100% Docker.
 - Flyway là nguồn sự thật cho schema.
-- Không sửa V1 hoặc V2.
-- Bước tiếp theo hiện tại là V3__seed_roles_and_permissions.sql.
+- Không sửa V1, V2 hoặc V3.
+- Bước tiếp theo hiện tại là Day 3 — Identity Repository Layer (chỉ kế hoạch, chưa triển khai).
 - Khi viết prompt cho coding agent, dùng @File.java để tôi tag file.
 - Trước khi bắt đầu, hãy yêu cầu tôi kiểm tra Git status, branch và Docker state.
 ```
@@ -1418,27 +1434,25 @@ Yêu cầu làm việc:
 Điểm tiếp tục hiện tại:
 
 ```text
-Bắt đầu thiết kế V3__seed_roles_and_permissions.sql
+Day 3 — Identity Repository Layer
 ```
 
-Nhưng chưa được viết migration ngay lập tức.
+Đây mới chỉ là kế hoạch, chưa triển khai.
 
-Trình tự đúng:
+Trình tự đúng để bắt đầu Day 3:
 
 1. Kiểm tra Git và Docker state.
-2. Đọc `docs/security.md`.
-3. Đọc `docs/api.md`.
-4. Xác định permission catalog MVP.
-5. Xác định role-permission matrix.
-6. Review với người dùng.
-7. Sau khi chốt mới tạo V3.
-8. Build Docker backend.
-9. Chạy Flyway.
-10. Kiểm tra dữ liệu seed.
-11. Commit backend.
-12. Push backend.
-13. Commit root submodule pointer nếu cần.
-14. Push root.
+2. Xác nhận Flyway đang ở version 3 và V3 đã seed đúng 4 role / 84 permission / 119 mapping.
+3. Rà soát lại 9 entity trong `backend/src/main/java/com/hhtuann/backend/identity/domain/model`.
+4. Xác định query thực sự cần thiết cho Identity trước khi tạo repository.
+5. Review danh sách query với người dùng.
+6. Sau khi chốt mới tạo repository.
+7. Build Docker backend.
+8. Chạy test / kiểm tra Hibernate validate.
+9. Commit backend.
+10. Push backend.
+11. Commit root submodule pointer nếu cần.
+12. Push root.
 
 ---
 
@@ -1446,7 +1460,6 @@ Trình tự đúng:
 
 Không được tự giả định các nội dung sau nếu chưa đọc repository hiện tại:
 
-- Danh sách permission code cuối cùng
 - API endpoint path cuối cùng
 - JWT library cuối cùng
 - Thời gian sống access token
@@ -1458,7 +1471,9 @@ Không được tự giả định các nội dung sau nếu chưa đọc reposi
 - Production secret management
 - Frontend local changes hiện có là gì
 
-Các quyết định này phải được thảo luận hoặc kiểm tra trong code/docs trước khi triển khai.
+Lưu ý: Danh sách permission code cuối cùng ĐÃ được xác nhận tại `docs/security.md` và seed tại V3 (4 role, 84 permission, mapping 13/51/46/9). Không tự ý thêm permission hoặc role ngoài catalog này.
+
+Các quyết định còn lại phải được thảo luận hoặc kiểm tra trong code/docs trước khi triển khai.
 
 ---
 
@@ -1468,12 +1483,14 @@ Dự án đã hoàn thành nền tảng quan trọng nhất:
 
 - Hạ tầng Docker
 - PostgreSQL và Redis
-- Flyway
-- Identity schema
-- JPA model
+- Flyway (hiện version 3)
+- Identity schema (V2)
+- JPA model (9 file)
+- Permission catalog và role-permission matrix đã chốt (`docs/security.md`)
+- V3 seed roles & permissions đã áp dụng và kiểm chứng trực tiếp trong PostgreSQL
 - Validation giữa code và database
-- Git checkpoint rõ ràng
+- Git checkpoint rõ ràng (backend & root đã push, đồng bộ `origin/main`)
 
-Ưu tiên tiếp theo không phải viết nhanh nhiều endpoint, mà là chốt permission model đúng ngay từ V3. Sai permission catalog ở giai đoạn này sẽ khiến toàn bộ authentication và authorization về sau phải sửa lại.
+Permission model đã được chốt đúng ở V3: 4 role, 84 permission, mapping 13/51/46/9, không `PROCTOR`, không `ATTEMPT_CANCEL`.
 
-Do đó, bước tiếp theo phải bắt đầu bằng review tài liệu bảo mật và tạo role-permission matrix, không bắt đầu bằng việc code controller.
+Bước tiếp theo là Day 3 — Identity Repository Layer, bắt đầu bằng rà soát entity và xác định query thực sự cần thiết, không bắt đầu bằng việc code controller.
