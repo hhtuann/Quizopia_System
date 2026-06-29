@@ -120,7 +120,7 @@ Quizopia-System
 Remote:
 
 ```text
-https://github.com/hhtuann/Quizopia-System.git
+https://github.com/hhtuann/Quizopia_System.git
 ```
 
 Backend là Git submodule:
@@ -970,26 +970,32 @@ Backend commit `0f83e2f` đã được push lên remote mới `https://github.co
 
 ## 10.2. Root commit
 
-Commit hiện tại (HEAD):
+Day 3 implementation checkpoint:
 
 ```text
-77da2fb docs: update project handoff for day 3
+7d2b663 chore(project): finalize day 3 repository layer
 ```
 
-Root chưa commit các thay đổi Day 3 tại thời điểm cập nhật tài liệu này. Root repository đang chuẩn bị commit các thay đổi sau:
+Root commit `7d2b663` đã commit các thay đổi Day 3 sau:
 
 ```text
-backend submodule pointer (trỏ tới 0f83e2f)
-docker-compose.yml
-.gitmodules
-QUIZOPIA_PROJECT_HANDOFF.md
+backend submodule pointer (trỏ tới backend commit 0f83e2f)
+docker-compose.yml (có service backend-test)
+.gitmodules (dùng backend remote mới)
+QUIZOPIA_PROJECT_HANDOFF.md (cập nhật Day 3)
 ```
 
-Không tự bịa ra một root commit mới khi chưa thực sự commit.
+Remote state:
+
+```text
+main == origin/main
+```
+
+Root commit `7d2b663` đã được push lên remote mới `https://github.com/hhtuann/Quizopia_System.git`. Root branch `main` đã đồng bộ với `origin/main` tại checkpoint kết thúc Day 3.
 
 ## 10.3. Local changes chưa commit
 
-Root repository đang chứa các thay đổi Day 3 chưa commit (xem 10.2) ngoài các mục sau vốn nằm ngoài phạm vi:
+Sau checkpoint Day 3 (`7d2b663`), backend submodule pointer, `docker-compose.yml`, `.gitmodules` và `QUIZOPIA_PROJECT_HANDOFF.md` đã được commit và không còn nằm trong nhóm thay đổi chưa commit. Các mục sau vẫn có thể tồn tại local và nằm ngoài phạm vi:
 
 ```text
  m frontend
@@ -1074,6 +1080,7 @@ Bài học:
 - Integration test chạy trên PostgreSQL 17 Testcontainers
 - 14 test, 0 failure, 0 error, 0 skipped, BUILD SUCCESS
 - Backend đã commit (`0f83e2f`) và push lên remote mới
+- Root đã commit (`7d2b663`) và push lên remote mới, đồng bộ `origin/main`
 
 Flyway database hiện ở version 4. V1, V2, V3, V4 đều đã áp dụng và không được sửa nữa.
 
@@ -1531,8 +1538,9 @@ docker compose ps
 
 Sau đó kiểm tra:
 
-- Root đang ở commit `77da2fb`, với các thay đổi Day 3 (backend submodule pointer, `docker-compose.yml`, `.gitmodules`, `QUIZOPIA_PROJECT_HANDOFF.md`) có thể chưa commit.
+- Root đang ở commit `7d2b663` hoặc commit mới hơn hợp lệ.
 - Backend đang ở `0f83e2f` hoặc commit mới hơn hợp lệ.
+- Root `main` đồng bộ với `origin/main` tại checkpoint kết thúc Day 3.
 - Không có thay đổi backend chưa rõ nguồn gốc.
 - Frontend vẫn có thể hiện `m frontend`.
 - `.claude/`, `.gitignore` và `.vscode/` vẫn có thể untracked.
@@ -1651,7 +1659,7 @@ Dự án đã hoàn thành nền tảng quan trọng nhất:
 - Identity Repository Layer (6 repository)
 - Integration test trên PostgreSQL 17 Testcontainers (14 test, 0 failure)
 - Validation giữa code và database
-- Git checkpoint backend đã push lên remote mới; root đang chứa thay đổi Day 3 chưa commit
+- Git checkpoint backend (`0f83e2f`) và root (`7d2b663`) đều đã push lên remote mới, đồng bộ `origin/main`
 
 Permission model đã được chốt đúng ở V3: 4 role, 84 permission, mapping 13/51/46/9, không `PROCTOR`, không `ATTEMPT_CANCEL`.
 
