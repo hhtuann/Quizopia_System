@@ -1,6 +1,6 @@
 # Quizopia Security Specification
 
-> Trạng thái: **Draft for review before V3**
+> Trạng thái: **Approved permission design for V3 — migration chưa được triển khai**
 >
 > Phạm vi hiện tại: **Identity, Authentication, Authorization foundation**
 >
@@ -91,7 +91,7 @@ Không cấp permission rộng chỉ để triển khai nhanh.
 Quizopia không mặc định dùng hierarchy:
 
 ```text
-SYSTEM_ADMIN > ACADEMIC_ADMIN > TEACHER > PROCTOR > STUDENT
+SYSTEM_ADMIN, ACADEMIC_ADMIN, TEACHER và STUDENT
 ```
 
 Các role là các nhóm trách nhiệm khác nhau.
@@ -108,80 +108,44 @@ Nếu một SYSTEM_ADMIN cần thực hiện nghiệp vụ học thuật, tài k
 
 # 3. Role model
 
-Các role nền tảng:
+Quizopia có đúng **4 role nền tảng**:
 
 ```text
 SYSTEM_ADMIN
 ACADEMIC_ADMIN
 TEACHER
-PROCTOR
 STUDENT
 ```
 
+Một user có thể có nhiều role thông qua `user_roles`, nhưng không tồn tại role hierarchy ngầm.
+
 ## 3.1. SYSTEM_ADMIN
 
-Trách nhiệm dự kiến:
-
-- Quản trị vận hành hệ thống.
-- Quản trị account, role và permission theo phạm vi được phép.
-- Theo dõi tình trạng kỹ thuật và cấu hình hệ thống.
-- Xử lý sự cố bảo mật ở mức nền tảng.
-
-Không mặc định có quyền:
-
-- Tạo hoặc sửa câu hỏi học thuật.
-- Tạo hoặc sửa đề thi.
-- Chấm bài.
-- Xem đáp án hoặc kết quả học tập không thuộc phạm vi quản trị kỹ thuật.
+- Quản trị account, role, refresh session và vận hành nền tảng.
+- Tạo school ở bước bootstrap.
+- Không mặc định có quyền quản lý nội dung học thuật, đề thi hoặc điểm.
 
 ## 3.2. ACADEMIC_ADMIN
 
-Trách nhiệm dự kiến:
-
-- Quản trị dữ liệu trường học và học thuật trong school scope.
-- Quản lý khối lớp, môn học, lớp học và phân công.
-- Quản lý hoạt động thi ở cấp học thuật theo permission cụ thể.
-- Có thể xem báo cáo học thuật trong phạm vi được phép.
-
-Không mặc định có quyền quản trị hệ thống hoặc cấu hình bảo mật nền tảng.
+- Quản lý học vụ trong school scope được phân công.
+- Quản lý khối lớp, môn học, hồ sơ, lớp học và phân công.
+- Điều phối ca thi, thí sinh, kết quả và báo cáo.
+- Không tạo user account, không tạo/sửa câu hỏi, không publish đề và không thay đổi điểm.
 
 ## 3.3. TEACHER
 
-Trách nhiệm dự kiến:
+- Quản lý ngân hàng câu hỏi, đề thi và ca thi thuộc phạm vi phụ trách.
+- Tự giám sát ca thi bằng `EXAM_SESSION_MONITOR`.
+- Xem bài làm, chấm điểm, công bố kết quả và xem báo cáo.
+- Mọi quyền vẫn phải kết hợp ownership, assignment, school scope, state và time.
 
-- Quản lý ngân hàng câu hỏi của mình hoặc tài nguyên được chia sẻ.
-- Tạo và quản lý đề thi thuộc môn/phạm vi được phân công.
-- Tạo ca thi hoặc tham gia vận hành ca thi khi được phép.
-- Xem và chấm bài trong phạm vi được phân công.
+Quizopia **không còn role `PROCTOR`**; trách nhiệm giám sát thuộc `TEACHER`.
 
-Permission của TEACHER luôn phải kết hợp ownership hoặc assignment.
+## 3.4. STUDENT
 
-## 3.4. PROCTOR
-
-Trách nhiệm dự kiến:
-
-- Theo dõi ca thi được phân công.
-- Xem trạng thái thí sinh trong ca thi được phân công.
-- Ghi nhận hoặc xử lý sự cố theo permission được cấp.
-
-PROCTOR không mặc định được:
-
-- Sửa nội dung đề.
-- Xem đáp án.
-- Chấm bài.
-- Quản lý toàn bộ ca thi của hệ thống.
-
-## 3.5. STUDENT
-
-Trách nhiệm dự kiến:
-
-- Xem các ca thi mình được phép tham gia.
-- Bắt đầu attempt hợp lệ.
-- Autosave câu trả lời.
-- Submit bài thi.
-- Xem kết quả theo chính sách công bố.
-
-STUDENT chỉ được truy cập tài nguyên của chính mình và các exam session mà mình là participant hợp lệ.
+- Xem đề và ca thi mình được phép tham gia.
+- Bắt đầu attempt, đọc/autosave câu trả lời và submit bài.
+- Xem kết quả của chính mình khi grade đã release và policy của đề cho phép.
 
 ---
 
@@ -249,10 +213,15 @@ chỉ cho phép sửa câu hỏi nếu:
 Ví dụ:
 
 ```text
-PROCTOR có EXAM_SESSION_MONITOR
+TEACHER có EXAM_SESSION_MONITOR
 ```
 
-chỉ được monitor session nếu được phân công cho session đó.
+chỉ được monitor session khi:
+
+* Session thuộc exam do teacher sở hữu hoặc teacher được phân công hợp lệ.
+* Teacher phụ trách đúng môn học.
+* Tài nguyên nằm trong đúng school scope.
+* Session đang ở trạng thái cho phép giám sát.
 
 ## 4.4. School scope
 
@@ -810,77 +779,441 @@ Không trả stack trace hoặc SQL error production.
 
 ---
 
-# 12. Permission strategy cho V3
+# 12. Permission catalog và role-permission matrix cho V3
 
-V3 sẽ seed:
+## 12.1. Trạng thái đã chốt
 
-- Role catalog.
-- Permission catalog.
-- Role-permission mapping mặc định.
+```text
+Số role:       4
+Số permission: 84
+```
 
-Permission code phải:
+Role được seed:
 
-- Ổn định.
-- Uppercase.
-- Mô tả một hành động.
-- Không chứa ownership trong tên nếu ownership được kiểm tra ở service.
-- Không quá rộng.
-- Không quá nhỏ đến mức mỗi field là một permission.
+```text
+SYSTEM_ADMIN
+ACADEMIC_ADMIN
+TEACHER
+STUDENT
+```
 
-Convention đề xuất:
+Không seed `PROCTOR`. Giáo viên tự giám sát ca thi bằng `EXAM_SESSION_MONITOR`.
+
+Permission dùng convention:
 
 ```text
 RESOURCE_ACTION
 ```
 
-Ví dụ:
+Permission chỉ mô tả hành động. Ownership, assignment, school scope, participation, trạng thái tài nguyên và time window vẫn do service policy kiểm tra.
+
+## 12.2. Permission catalog đầy đủ
+
+|    # | Nhóm                                         | Permission                         |
+| ---: | -------------------------------------------- | ---------------------------------- |
+|    1 | Identity & System                            | `USER_CREATE`                      |
+|    2 | Identity & System                            | `USER_READ`                        |
+|    3 | Identity & System                            | `USER_UPDATE`                      |
+|    4 | Identity & System                            | `USER_ACTIVATE`                    |
+|    5 | Identity & System                            | `USER_DISABLE`                     |
+|    6 | Identity & System                            | `USER_ENABLE`                      |
+|    7 | Identity & System                            | `USER_LOCK`                        |
+|    8 | Identity & System                            | `USER_UNLOCK`                      |
+|    9 | Identity & System                            | `USER_ROLE_ASSIGN`                 |
+|   10 | Identity & System                            | `USER_SESSION_REVOKE`              |
+|   11 | Identity & System                            | `ROLE_READ`                        |
+|   12 | Identity & System                            | `PERMISSION_READ`                  |
+|   13 | Academic — School, Grade Level, Subject      | `SCHOOL_CREATE`                    |
+|   14 | Academic — School, Grade Level, Subject      | `SCHOOL_READ`                      |
+|   15 | Academic — School, Grade Level, Subject      | `SCHOOL_UPDATE`                    |
+|   16 | Academic — School, Grade Level, Subject      | `SCHOOL_STATUS_UPDATE`             |
+|   17 | Academic — School, Grade Level, Subject      | `GRADE_LEVEL_CREATE`               |
+|   18 | Academic — School, Grade Level, Subject      | `GRADE_LEVEL_READ`                 |
+|   19 | Academic — School, Grade Level, Subject      | `GRADE_LEVEL_UPDATE`               |
+|   20 | Academic — School, Grade Level, Subject      | `SUBJECT_CREATE`                   |
+|   21 | Academic — School, Grade Level, Subject      | `SUBJECT_READ`                     |
+|   22 | Academic — School, Grade Level, Subject      | `SUBJECT_UPDATE`                   |
+|   23 | Academic — School, Grade Level, Subject      | `SUBJECT_STATUS_UPDATE`            |
+|   24 | Academic — Profiles, Classrooms, Assignments | `TEACHER_PROFILE_CREATE`           |
+|   25 | Academic — Profiles, Classrooms, Assignments | `TEACHER_PROFILE_READ`             |
+|   26 | Academic — Profiles, Classrooms, Assignments | `TEACHER_PROFILE_UPDATE`           |
+|   27 | Academic — Profiles, Classrooms, Assignments | `TEACHER_PROFILE_STATUS_UPDATE`    |
+|   28 | Academic — Profiles, Classrooms, Assignments | `STUDENT_PROFILE_CREATE`           |
+|   29 | Academic — Profiles, Classrooms, Assignments | `STUDENT_PROFILE_READ`             |
+|   30 | Academic — Profiles, Classrooms, Assignments | `STUDENT_PROFILE_UPDATE`           |
+|   31 | Academic — Profiles, Classrooms, Assignments | `STUDENT_PROFILE_STATUS_UPDATE`    |
+|   32 | Academic — Profiles, Classrooms, Assignments | `CLASSROOM_CREATE`                 |
+|   33 | Academic — Profiles, Classrooms, Assignments | `CLASSROOM_READ`                   |
+|   34 | Academic — Profiles, Classrooms, Assignments | `CLASSROOM_UPDATE`                 |
+|   35 | Academic — Profiles, Classrooms, Assignments | `CLASSROOM_STATUS_UPDATE`          |
+|   36 | Academic — Profiles, Classrooms, Assignments | `CLASSROOM_MEMBER_READ`            |
+|   37 | Academic — Profiles, Classrooms, Assignments | `CLASSROOM_MEMBER_ADD`             |
+|   38 | Academic — Profiles, Classrooms, Assignments | `CLASSROOM_MEMBER_REMOVE`          |
+|   39 | Academic — Profiles, Classrooms, Assignments | `CLASSROOM_TEACHER_ASSIGN`         |
+|   40 | Academic — Profiles, Classrooms, Assignments | `TEACHER_SUBJECT_ASSIGN`           |
+|   41 | Question Bank                                | `QUESTION_BANK_CREATE`             |
+|   42 | Question Bank                                | `QUESTION_BANK_READ`               |
+|   43 | Question Bank                                | `QUESTION_BANK_UPDATE`             |
+|   44 | Question Bank                                | `QUESTION_BANK_STATUS_UPDATE`      |
+|   45 | Question Bank                                | `QUESTION_CREATE`                  |
+|   46 | Question Bank                                | `QUESTION_READ`                    |
+|   47 | Question Bank                                | `QUESTION_UPDATE`                  |
+|   48 | Question Bank                                | `QUESTION_ARCHIVE`                 |
+|   49 | Exam — Purpose and Content                   | `EXAM_PURPOSE_CREATE`              |
+|   50 | Exam — Purpose and Content                   | `EXAM_PURPOSE_READ`                |
+|   51 | Exam — Purpose and Content                   | `EXAM_PURPOSE_UPDATE`              |
+|   52 | Exam — Purpose and Content                   | `EXAM_CREATE`                      |
+|   53 | Exam — Purpose and Content                   | `EXAM_READ`                        |
+|   54 | Exam — Purpose and Content                   | `EXAM_UPDATE`                      |
+|   55 | Exam — Purpose and Content                   | `EXAM_VERSION_CREATE`              |
+|   56 | Exam — Purpose and Content                   | `EXAM_PUBLISH`                     |
+|   57 | Exam — Purpose and Content                   | `EXAM_ARCHIVE`                     |
+|   58 | Exam — Sessions and Participants             | `EXAM_SESSION_CREATE`              |
+|   59 | Exam — Sessions and Participants             | `EXAM_SESSION_READ`                |
+|   60 | Exam — Sessions and Participants             | `EXAM_SESSION_UPDATE`              |
+|   61 | Exam — Sessions and Participants             | `EXAM_SESSION_SCHEDULE`            |
+|   62 | Exam — Sessions and Participants             | `EXAM_SESSION_OPEN`                |
+|   63 | Exam — Sessions and Participants             | `EXAM_SESSION_CLOSE`               |
+|   64 | Exam — Sessions and Participants             | `EXAM_SESSION_CANCEL`              |
+|   65 | Exam — Sessions and Participants             | `EXAM_SESSION_ARCHIVE`             |
+|   66 | Exam — Sessions and Participants             | `EXAM_SESSION_PARTICIPANT_READ`    |
+|   67 | Exam — Sessions and Participants             | `EXAM_SESSION_PARTICIPANT_ADD`     |
+|   68 | Exam — Sessions and Participants             | `EXAM_SESSION_PARTICIPANT_BLOCK`   |
+|   69 | Exam — Sessions and Participants             | `EXAM_SESSION_PARTICIPANT_UNBLOCK` |
+|   70 | Exam — Sessions and Participants             | `EXAM_SESSION_PARTICIPANT_REMOVE`  |
+|   71 | Exam — Sessions and Participants             | `EXAM_SESSION_MONITOR`             |
+|   72 | Attempt                                      | `ATTEMPT_START`                    |
+|   73 | Attempt                                      | `ATTEMPT_READ`                     |
+|   74 | Attempt                                      | `ATTEMPT_ANSWER_READ`              |
+|   75 | Attempt                                      | `ATTEMPT_ANSWER_SAVE`              |
+|   76 | Attempt                                      | `ATTEMPT_SUBMIT`                   |
+|   77 | Grading                                      | `GRADE_READ`                       |
+|   78 | Grading                                      | `GRADE_ITEM_READ`                  |
+|   79 | Grading                                      | `GRADE_MANUAL_SCORE`               |
+|   80 | Grading                                      | `GRADE_OVERRIDE`                   |
+|   81 | Grading                                      | `GRADE_FINALIZE`                   |
+|   82 | Grading                                      | `GRADE_RELEASE`                    |
+|   83 | Reporting                                    | `REPORT_READ`                      |
+|   84 | Reporting                                    | `REPORT_EXPORT`                    |
+
+## 12.3. Tổng số permission theo nhóm
+
+| Nhóm                                         | Số lượng |
+| -------------------------------------------- | -------: |
+| Identity & System                            |       12 |
+| Academic — School, Grade Level, Subject      |       11 |
+| Academic — Profiles, Classrooms, Assignments |       17 |
+| Question Bank                                |        8 |
+| Exam — Purpose and Content                   |        9 |
+| Exam — Sessions and Participants             |       14 |
+| Attempt                                      |        5 |
+| Grading                                      |        6 |
+| Reporting                                    |        2 |
+| **Tổng**                                     |   **84** |
+
+`ATTEMPT_CANCEL` đã bị loại khỏi catalog vì chưa có use case và state transition rõ ràng.
+
+`QUESTION_BANK_UPDATE` bao gồm tên, mô tả và visibility; thay đổi trạng thái dùng riêng `QUESTION_BANK_STATUS_UPDATE`.
+
+## 12.4. Tổng số permission theo role
+
+| Role             | Số permission | Trách nhiệm chính                                             |
+| ---------------- | ------------: | ------------------------------------------------------------- |
+| `SYSTEM_ADMIN`   |            13 | Account, role, session và bootstrap school                    |
+| `ACADEMIC_ADMIN` |            51 | Quản lý học vụ, điều phối thi, xem kết quả và báo cáo         |
+| `TEACHER`        |            46 | Question bank, đề thi, ca thi, giám sát, chấm điểm và báo cáo |
+| `STUDENT`        |             9 | Tham gia thi và xem kết quả của chính mình theo policy        |
+
+## 12.5. Ma trận Role → Permission
+
+| Nhóm                                         | Permission                         | SYSTEM_ADMIN | ACADEMIC_ADMIN | TEACHER | STUDENT |
+| -------------------------------------------- | ---------------------------------- | :----------: | :------------: | :-----: | :-----: |
+| Identity & System                            | `USER_CREATE`                      |      ✅       |       —        |    —    |    —    |
+| Identity & System                            | `USER_READ`                        |      ✅       |       ✅        |    —    |    —    |
+| Identity & System                            | `USER_UPDATE`                      |      ✅       |       —        |    —    |    —    |
+| Identity & System                            | `USER_ACTIVATE`                    |      ✅       |       —        |    —    |    —    |
+| Identity & System                            | `USER_DISABLE`                     |      ✅       |       —        |    —    |    —    |
+| Identity & System                            | `USER_ENABLE`                      |      ✅       |       —        |    —    |    —    |
+| Identity & System                            | `USER_LOCK`                        |      ✅       |       —        |    —    |    —    |
+| Identity & System                            | `USER_UNLOCK`                      |      ✅       |       —        |    —    |    —    |
+| Identity & System                            | `USER_ROLE_ASSIGN`                 |      ✅       |       —        |    —    |    —    |
+| Identity & System                            | `USER_SESSION_REVOKE`              |      ✅       |       —        |    —    |    —    |
+| Identity & System                            | `ROLE_READ`                        |      ✅       |       —        |    —    |    —    |
+| Identity & System                            | `PERMISSION_READ`                  |      ✅       |       —        |    —    |    —    |
+| Academic — School, Grade Level, Subject      | `SCHOOL_CREATE`                    |      ✅       |       —        |    —    |    —    |
+| Academic — School, Grade Level, Subject      | `SCHOOL_READ`                      |      —       |       ✅        |    ✅    |    —    |
+| Academic — School, Grade Level, Subject      | `SCHOOL_UPDATE`                    |      —       |       ✅        |    —    |    —    |
+| Academic — School, Grade Level, Subject      | `SCHOOL_STATUS_UPDATE`             |      —       |       ✅        |    —    |    —    |
+| Academic — School, Grade Level, Subject      | `GRADE_LEVEL_CREATE`               |      —       |       ✅        |    —    |    —    |
+| Academic — School, Grade Level, Subject      | `GRADE_LEVEL_READ`                 |      —       |       ✅        |    ✅    |    —    |
+| Academic — School, Grade Level, Subject      | `GRADE_LEVEL_UPDATE`               |      —       |       ✅        |    —    |    —    |
+| Academic — School, Grade Level, Subject      | `SUBJECT_CREATE`                   |      —       |       ✅        |    —    |    —    |
+| Academic — School, Grade Level, Subject      | `SUBJECT_READ`                     |      —       |       ✅        |    ✅    |    —    |
+| Academic — School, Grade Level, Subject      | `SUBJECT_UPDATE`                   |      —       |       ✅        |    —    |    —    |
+| Academic — School, Grade Level, Subject      | `SUBJECT_STATUS_UPDATE`            |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `TEACHER_PROFILE_CREATE`           |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `TEACHER_PROFILE_READ`             |      —       |       ✅        |    ✅    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `TEACHER_PROFILE_UPDATE`           |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `TEACHER_PROFILE_STATUS_UPDATE`    |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `STUDENT_PROFILE_CREATE`           |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `STUDENT_PROFILE_READ`             |      —       |       ✅        |    ✅    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `STUDENT_PROFILE_UPDATE`           |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `STUDENT_PROFILE_STATUS_UPDATE`    |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `CLASSROOM_CREATE`                 |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `CLASSROOM_READ`                   |      —       |       ✅        |    ✅    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `CLASSROOM_UPDATE`                 |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `CLASSROOM_STATUS_UPDATE`          |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `CLASSROOM_MEMBER_READ`            |      —       |       ✅        |    ✅    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `CLASSROOM_MEMBER_ADD`             |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `CLASSROOM_MEMBER_REMOVE`          |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `CLASSROOM_TEACHER_ASSIGN`         |      —       |       ✅        |    —    |    —    |
+| Academic — Profiles, Classrooms, Assignments | `TEACHER_SUBJECT_ASSIGN`           |      —       |       ✅        |    —    |    —    |
+| Question Bank                                | `QUESTION_BANK_CREATE`             |      —       |       —        |    ✅    |    —    |
+| Question Bank                                | `QUESTION_BANK_READ`               |      —       |       —        |    ✅    |    —    |
+| Question Bank                                | `QUESTION_BANK_UPDATE`             |      —       |       —        |    ✅    |    —    |
+| Question Bank                                | `QUESTION_BANK_STATUS_UPDATE`      |      —       |       —        |    ✅    |    —    |
+| Question Bank                                | `QUESTION_CREATE`                  |      —       |       —        |    ✅    |    —    |
+| Question Bank                                | `QUESTION_READ`                    |      —       |       —        |    ✅    |    —    |
+| Question Bank                                | `QUESTION_UPDATE`                  |      —       |       —        |    ✅    |    —    |
+| Question Bank                                | `QUESTION_ARCHIVE`                 |      —       |       —        |    ✅    |    —    |
+| Exam — Purpose and Content                   | `EXAM_PURPOSE_CREATE`              |      —       |       ✅        |    —    |    —    |
+| Exam — Purpose and Content                   | `EXAM_PURPOSE_READ`                |      —       |       ✅        |    ✅    |    —    |
+| Exam — Purpose and Content                   | `EXAM_PURPOSE_UPDATE`              |      —       |       ✅        |    —    |    —    |
+| Exam — Purpose and Content                   | `EXAM_CREATE`                      |      —       |       —        |    ✅    |    —    |
+| Exam — Purpose and Content                   | `EXAM_READ`                        |      —       |       ✅        |    ✅    |    ✅    |
+| Exam — Purpose and Content                   | `EXAM_UPDATE`                      |      —       |       —        |    ✅    |    —    |
+| Exam — Purpose and Content                   | `EXAM_VERSION_CREATE`              |      —       |       —        |    ✅    |    —    |
+| Exam — Purpose and Content                   | `EXAM_PUBLISH`                     |      —       |       —        |    ✅    |    —    |
+| Exam — Purpose and Content                   | `EXAM_ARCHIVE`                     |      —       |       —        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_CREATE`              |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_READ`                |      —       |       ✅        |    ✅    |    ✅    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_UPDATE`              |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_SCHEDULE`            |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_OPEN`                |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_CLOSE`               |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_CANCEL`              |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_ARCHIVE`             |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_PARTICIPANT_READ`    |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_PARTICIPANT_ADD`     |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_PARTICIPANT_BLOCK`   |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_PARTICIPANT_UNBLOCK` |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_PARTICIPANT_REMOVE`  |      —       |       ✅        |    ✅    |    —    |
+| Exam — Sessions and Participants             | `EXAM_SESSION_MONITOR`             |      —       |       ✅        |    ✅    |    —    |
+| Attempt                                      | `ATTEMPT_START`                    |      —       |       —        |    —    |    ✅    |
+| Attempt                                      | `ATTEMPT_READ`                     |      —       |       ✅        |    ✅    |    ✅    |
+| Attempt                                      | `ATTEMPT_ANSWER_READ`              |      —       |       —        |    ✅    |    ✅    |
+| Attempt                                      | `ATTEMPT_ANSWER_SAVE`              |      —       |       —        |    —    |    ✅    |
+| Attempt                                      | `ATTEMPT_SUBMIT`                   |      —       |       —        |    —    |    ✅    |
+| Grading                                      | `GRADE_READ`                       |      —       |       ✅        |    ✅    |    ✅    |
+| Grading                                      | `GRADE_ITEM_READ`                  |      —       |       ✅        |    ✅    |    ✅    |
+| Grading                                      | `GRADE_MANUAL_SCORE`               |      —       |       —        |    ✅    |    —    |
+| Grading                                      | `GRADE_OVERRIDE`                   |      —       |       —        |    ✅    |    —    |
+| Grading                                      | `GRADE_FINALIZE`                   |      —       |       —        |    ✅    |    —    |
+| Grading                                      | `GRADE_RELEASE`                    |      —       |       —        |    ✅    |    —    |
+| Reporting                                    | `REPORT_READ`                      |      —       |       ✅        |    ✅    |    —    |
+| Reporting                                    | `REPORT_EXPORT`                    |      —       |       ✅        |    ✅    |    —    |
+
+## 12.6. Danh sách permission theo từng role
+
+### `SYSTEM_ADMIN` — 13 permission
 
 ```text
 USER_CREATE
 USER_READ
 USER_UPDATE
+USER_ACTIVATE
 USER_DISABLE
-
-ROLE_ASSIGN
-
+USER_ENABLE
+USER_LOCK
+USER_UNLOCK
+USER_ROLE_ASSIGN
+USER_SESSION_REVOKE
+ROLE_READ
+PERMISSION_READ
 SCHOOL_CREATE
+```
+### `ACADEMIC_ADMIN` — 51 permission
+
+```text
+USER_READ
 SCHOOL_READ
 SCHOOL_UPDATE
+SCHOOL_STATUS_UPDATE
+GRADE_LEVEL_CREATE
+GRADE_LEVEL_READ
+GRADE_LEVEL_UPDATE
+SUBJECT_CREATE
+SUBJECT_READ
+SUBJECT_UPDATE
+SUBJECT_STATUS_UPDATE
+TEACHER_PROFILE_CREATE
+TEACHER_PROFILE_READ
+TEACHER_PROFILE_UPDATE
+TEACHER_PROFILE_STATUS_UPDATE
+STUDENT_PROFILE_CREATE
+STUDENT_PROFILE_READ
+STUDENT_PROFILE_UPDATE
+STUDENT_PROFILE_STATUS_UPDATE
+CLASSROOM_CREATE
+CLASSROOM_READ
+CLASSROOM_UPDATE
+CLASSROOM_STATUS_UPDATE
+CLASSROOM_MEMBER_READ
+CLASSROOM_MEMBER_ADD
+CLASSROOM_MEMBER_REMOVE
+CLASSROOM_TEACHER_ASSIGN
+TEACHER_SUBJECT_ASSIGN
+EXAM_PURPOSE_CREATE
+EXAM_PURPOSE_READ
+EXAM_PURPOSE_UPDATE
+EXAM_READ
+EXAM_SESSION_CREATE
+EXAM_SESSION_READ
+EXAM_SESSION_UPDATE
+EXAM_SESSION_SCHEDULE
+EXAM_SESSION_OPEN
+EXAM_SESSION_CLOSE
+EXAM_SESSION_CANCEL
+EXAM_SESSION_ARCHIVE
+EXAM_SESSION_PARTICIPANT_READ
+EXAM_SESSION_PARTICIPANT_ADD
+EXAM_SESSION_PARTICIPANT_BLOCK
+EXAM_SESSION_PARTICIPANT_UNBLOCK
+EXAM_SESSION_PARTICIPANT_REMOVE
+EXAM_SESSION_MONITOR
+ATTEMPT_READ
+GRADE_READ
+GRADE_ITEM_READ
+REPORT_READ
+REPORT_EXPORT
+```
+### `TEACHER` — 46 permission
 
+```text
+SCHOOL_READ
+GRADE_LEVEL_READ
+SUBJECT_READ
+TEACHER_PROFILE_READ
+STUDENT_PROFILE_READ
+CLASSROOM_READ
+CLASSROOM_MEMBER_READ
 QUESTION_BANK_CREATE
 QUESTION_BANK_READ
 QUESTION_BANK_UPDATE
-QUESTION_BANK_DELETE
-
+QUESTION_BANK_STATUS_UPDATE
 QUESTION_CREATE
 QUESTION_READ
 QUESTION_UPDATE
 QUESTION_ARCHIVE
-
+EXAM_PURPOSE_READ
 EXAM_CREATE
 EXAM_READ
 EXAM_UPDATE
+EXAM_VERSION_CREATE
 EXAM_PUBLISH
-
+EXAM_ARCHIVE
 EXAM_SESSION_CREATE
 EXAM_SESSION_READ
 EXAM_SESSION_UPDATE
+EXAM_SESSION_SCHEDULE
+EXAM_SESSION_OPEN
+EXAM_SESSION_CLOSE
+EXAM_SESSION_CANCEL
+EXAM_SESSION_ARCHIVE
+EXAM_SESSION_PARTICIPANT_READ
+EXAM_SESSION_PARTICIPANT_ADD
+EXAM_SESSION_PARTICIPANT_BLOCK
+EXAM_SESSION_PARTICIPANT_UNBLOCK
+EXAM_SESSION_PARTICIPANT_REMOVE
 EXAM_SESSION_MONITOR
-
-ATTEMPT_START
-ATTEMPT_READ_OWN
-ATTEMPT_ANSWER_OWN
-ATTEMPT_SUBMIT_OWN
-
+ATTEMPT_READ
+ATTEMPT_ANSWER_READ
 GRADE_READ
-GRADE_UPDATE
-
+GRADE_ITEM_READ
+GRADE_MANUAL_SCORE
+GRADE_OVERRIDE
+GRADE_FINALIZE
+GRADE_RELEASE
 REPORT_READ
+REPORT_EXPORT
+```
+### `STUDENT` — 9 permission
+
+```text
+EXAM_READ
+EXAM_SESSION_READ
+ATTEMPT_START
+ATTEMPT_READ
+ATTEMPT_ANSWER_READ
+ATTEMPT_ANSWER_SAVE
+ATTEMPT_SUBMIT
+GRADE_READ
+GRADE_ITEM_READ
 ```
 
-Danh sách trên chỉ là convention minh họa, chưa phải catalog V3 cuối cùng.
+## 12.7. Quy tắc phạm vi đặc biệt
 
-Catalog cuối cùng phải được chốt từ phạm vi 32 bảng và use case MVP.
+### SYSTEM_ADMIN
+
+- Có toàn bộ 12 permission Identity & System.
+- Có `SCHOOL_CREATE` để bootstrap trường mới.
+- Không mặc định có `SCHOOL_READ`, `SCHOOL_UPDATE` hoặc quyền học thuật.
+- Nếu sau này UI cần duyệt danh sách trường, phải quyết định cấp thêm `SCHOOL_READ`, không suy diễn từ `SCHOOL_CREATE`.
+
+### ACADEMIC_ADMIN
+
+- Mọi quyền bị giới hạn bởi school scope.
+- `USER_READ` chỉ phục vụ liên kết profile với user đã tồn tại.
+- Có `GRADE_ITEM_READ` nhưng không có `ATTEMPT_ANSWER_READ`: xem điểm từng câu nhưng không mặc định xem nội dung bài làm.
+- Không tạo/sửa câu hỏi, không tạo/sửa/publish đề và không thay đổi điểm.
+
+### TEACHER
+
+- Question bank, exam và session phải thuộc ownership hoặc assignment hợp lệ.
+- Tự giám sát ca thi; không có role PROCTOR.
+- `GRADE_OVERRIDE` và `GRADE_RELEASE` là quyền nhạy cảm và phải được ghi security/audit event.
+
+### STUDENT
+
+- Chỉ truy cập attempt của chính mình.
+- Chỉ start attempt khi là participant hợp lệ, trong time window và chưa vượt max attempts.
+- `GRADE_READ` và `GRADE_ITEM_READ` chỉ hoạt động khi grade đã `RELEASED`.
+- Xem điểm từng câu không đồng nghĩa luôn được xem answer key; còn phụ thuộc `show_result_policy` và `show_answer_policy`.
+
+## 12.8. Kết quả rà soát
+
+```text
+[✓] Có đúng 84 permission duy nhất
+[✓] Có đúng 4 role
+[✓] Không seed PROCTOR
+[✓] Mọi permission được gán cho ít nhất một role mặc định
+[✓] SYSTEM_ADMIN có 13 permission
+[✓] ACADEMIC_ADMIN có 51 permission
+[✓] TEACHER có 46 permission
+[✓] STUDENT có 9 permission
+[✓] SCHOOL_CREATE được gán cho SYSTEM_ADMIN
+[✓] ATTEMPT_CANCEL đã bị loại bỏ
+[✓] Không có hard-delete permission cho dữ liệu lịch sử
+[✓] Scope và business rule không bị mã hóa vào tên permission
+```
+
+## 12.9. Yêu cầu triển khai V3
+
+`V3__seed_roles_and_permissions.sql` phải:
+
+1. Insert đúng 4 role.
+2. Insert đúng 84 permission.
+3. Tạo mapping theo ma trận đã chốt.
+4. Lookup role và permission bằng `code`, không hard-code numeric ID.
+5. Không tạo role `PROCTOR`.
+6. Không tạo permission `ATTEMPT_CANCEL`.
+7. Không sửa V1 hoặc V2.
+8. Sau khi chạy phải xác nhận:
+   - Flyway schema version là 3.
+   - Có 4 role.
+   - Có 84 permission.
+   - Mapping count theo role là 13, 51, 46 và 9.
+   - Không có code hoặc mapping trùng lặp.
 
 ---
 
@@ -1167,7 +1500,7 @@ Bắt buộc có:
 - Có permission nhưng sai ownership → 403.
 - Có permission nhưng sai school scope → 403.
 - Teacher truy cập tài nguyên teacher khác → 403.
-- Proctor truy cập session không được phân công → 403.
+- Teacher monitor session ngoài ownership/assignment hoặc school scope → 403.
 - Student truy cập attempt người khác → 403.
 - Student bắt đầu session không phải participant → 403.
 - Resource state không cho phép → 409 hoặc 422 theo API convention.
