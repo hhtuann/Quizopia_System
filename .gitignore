@@ -1,8 +1,2 @@
 # Local MCP server config — contains DB credentials, do not commit
 .mcp.json
-
-# Claude Code — personal/local config
-# Vendor skill pack (16 MB, re-installable via .claude/skills/install.ps1) — not shared
-.claude/skills/
-# Per-machine overrides (model, permissions, etc.) — never commit
-.claude/settings.local.json
