@@ -58,7 +58,9 @@ services:
       # (see .env.example). Empty values make the backend fail fast on start.
       QUIZOPIA_JWT_SECRET_BASE64: ${QUIZOPIA_JWT_SECRET_BASE64:-}
       QUIZOPIA_DATA_ENCRYPTION_KEY_BASE64: ${QUIZOPIA_DATA_ENCRYPTION_KEY_BASE64:-}
-      QUIZOPIA_TEACHER_INVITE_CODE: ${QUIZOPIA_TEACHER_INVITE_CODE:-dev-teacher-invite}
+      # No usable default: a blank value makes the backend fail fast on start,
+      # forcing a real invite code to be supplied via the local .env file.
+      QUIZOPIA_TEACHER_INVITE_CODE: ${QUIZOPIA_TEACHER_INVITE_CODE:-}
       QUIZOPIA_ALLOWED_ORIGINS: ${QUIZOPIA_ALLOWED_ORIGINS:-http://localhost:3000}
       QUIZOPIA_COOKIE_SECURE: ${QUIZOPIA_COOKIE_SECURE:-false}
 
