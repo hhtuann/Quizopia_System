@@ -3,7 +3,7 @@
 > Mục đích của tài liệu này là giúp một phiên ChatGPT khác, một tài khoản khác, hoặc một thành viên mới có thể tiếp tục dự án Quizopia đúng luồng, không làm sai kiến trúc, không sửa nhầm migration đã áp dụng, và không phá vỡ cấu trúc Git submodule.
 >
 > Cập nhật lần cuối: 2026-06-30  
-> Trạng thái hiện tại: Hoàn tất Day 3 — Identity Repository Layer (Database đang ở Flyway version 4)
+> Trạng thái hiện tại: Hoàn tất Day 4 — Authentication Backend (Database đang ở Flyway version 5)
 
 ---
 
@@ -527,6 +527,141 @@ Các query đã triển khai:
 
 Lưu ý: chưa có query danh sách active refresh session. Query đó chưa được tạo trong Day 3.
 
+Trong Day 4, `RefreshSessionRepository` được mở rộng thêm method `findForUpdateByTokenHashWithUser(hash)` (`@Lock(PESSIMISTIC_WRITE)`, `@QueryHint lock.timeout=5000`, `join fetch user`) phục vụ refresh rotation an toàn dưới concurrency. Các method cũ của Day 3 được giữ nguyên.
+
+---
+
+## Day 4 — Authentication Backend (security primitives + authentication application & API)
+
+### 6.14. Migration V5
+
+File:
+
+```text
+backend/src/main/resources/db/migration/V5__add_encrypted_personal_data.sql
+```
+
+V5 thêm hai cột lưu dữ liệu cá nhân nhạy cảm dưới dạng AES-256-GCM ciphertext:
+
+```sql
+ALTER TABLE users
+    ADD COLUMN phone_encrypted TEXT,
+    ADD COLUMN national_id_encrypted TEXT,
+    ADD CONSTRAINT chk_users_phone_encrypted_format
+        CHECK (phone_encrypted IS NULL OR phone_encrypted LIKE 'v1:%'),
+    ADD CONSTRAINT chk_users_national_id_encrypted_format
+        CHECK (national_id_encrypted IS NULL OR national_id_encrypted LIKE 'v1:%');
+```
+
+Đặc điểm:
+
+- Hai cột `phone_encrypted`, `national_id_encrypted` đều nullable (TEXT).
+- Chỉ lưu ciphertext có prefix version `v1:`, không có cột plaintext.
+- Không tạo index trên ciphertext (không thể tìm kiếm).
+- Không có giá trị mặc định.
+- CHECK constraint bắt buộc ciphertext phải đúng prefix `v1:` (cho phép NULL).
+- Không sửa dữ liệu và migration V1–V4.
+
+V5 đã được Flyway áp dụng thành công. Sau V5, Flyway database version hiện là 5. Không được sửa V5 nữa.
+
+### 6.15. Security primitives (Batch 1)
+
+Lớp nguyên thủy bảo mật làm nền cho authentication đã triển khai:
+
+- Password hashing: Argon2id (không log password, không log hash).
+- Mã hóa dữ liệu cá nhân nhạy cảm: AES-256-GCM cho `phone` và `nationalId`, chỉ lưu ciphertext có prefix `v1:` (12-byte nonce + 16-byte tag, min payload 28 byte).
+- Access token JWT HS256, lifetime 15 phút, claims `sub, username, roles, token_version, jti, iss, aud, iat, exp`.
+- Refresh token dạng opaque, 256-bit entropy, chỉ lưu SHA-256 hash (64 hex) trong database.
+- Clock abstraction để test thời gian (`MutableClock`, `TestClockConfig` trong test).
+
+### 6.16. Authentication application & API (Batch 2)
+
+Đã triển khai đầy đủ năm endpoint authentication, chạy trên PostgreSQL 17 Testcontainers qua Docker.
+
+Năm endpoint:
+
+```text
+POST /api/auth/register   — public — đăng ký STUDENT (mặc định) hoặc TEACHER (cần invite code)
+POST /api/auth/login      — public — login theo username/email, set refresh cookie
+POST /api/auth/refresh    — public (cookie) — refresh rotation + reuse detection
+POST /api/auth/logout     — public (cookie) — revoke session hiện tại, idempotent, clear cookie
+GET  /api/auth/me         — Bearer JWT — trả thông tin user hiện tại + roles + permissions
+```
+
+Các chức năng authentication đã hoàn thành:
+
+- Đăng ký STUDENT (mặc định khi `accountType` null).
+- Đăng ký TEACHER bằng invite code (so sánh constant-time bằng `MessageDigest.isEqual`).
+- Login theo username hoặc email (dựa vào có/không có `@`, không phân biệt hoa thường), dummy Argon2 verify khi user thiếu để cân bằng timing.
+- Mật khẩu băm bằng Argon2id.
+- Dữ liệu cá nhân `phone` và `nationalId` mã hóa AES-256-GCM (chỉ lưu ciphertext).
+- Account lockout 5 lần sai liên tiếp trong 15 phút (dùng `failed_login_attempts` + `locked_until`, không đổi `UserStatus`).
+- JWT access token lifetime 15 phút (HS256).
+- Refresh token dạng opaque, gửi qua HttpOnly cookie `quizopia_refresh` (SameSite=Lax, Path `/api/auth`).
+- Refresh token rotation mỗi lần refresh, giữ `familyId` + `expiresAt` (không kéo dài family).
+- Phát hiện refresh token reuse → revoke toàn bộ token family (`revokeUnrevokedByFamilyId`, reason `TOKEN_REUSE_DETECTED`).
+- Logout phiên hiện tại (idempotent, luôn clear cookie).
+- `GET /api/auth/me` trả roles + permissions (decrypt dữ liệu cá nhân chỉ cho chính chủ).
+- JWT converter kiểm `token_version` và trạng thái ACTIVE mỗi request, build authorities `ROLE_<CODE>` + permission code nguyên bản.
+- CORS allowlist (reject wildcard) + `OriginCheckFilter` cho refresh/logout (chạy trước `CorsFilter`).
+- Error response thống nhất `ApiError` (timestamp, status, code, message, path, traceId) cho cả 4xx auth và fallback 500.
+- Integration test trên PostgreSQL 17 Testcontainers.
+
+SecurityFilterChain rules:
+
+```text
+permitAll    : POST /api/auth/{register,login,refresh,logout}; GET /actuator/health/**
+authenticated: GET /api/auth/me
+denyAll      : mọi request khác
+```
+
+Stateless; form-login, HTTP-Basic, OAuth-client tắt; CSRF tắt (stateless Bearer + HttpOnly+SameSite-Lax+Origin check bảo vệ cookie endpoints); resource-server JWT với converter tùy chỉnh.
+
+### 6.17. Environment variables bắt buộc
+
+Backend yêu cầu các biến môi trường sau. Giá trị secret thật KHÔNG được commit vào git và KHÔNG được ghi trong tài liệu này:
+
+```text
+QUIZOPIA_JWT_SECRET_BASE64            — base64 secret ký JWT HS256
+QUIZOPIA_DATA_ENCRYPTION_KEY_BASE64   — base64 key AES-256-GCM mã hóa phone/nationalId
+QUIZOPIA_TEACHER_INVITE_CODE          — invite code đăng ký TEACHER (docker-compose mặc định blank → fail-fast)
+QUIZOPIA_ALLOWED_ORIGINS              — danh sách origin CORS allowlist
+QUIZOPIA_COOKIE_SECURE                — cờ Secure cho refresh cookie (false ở dev, true ở production)
+```
+
+Không dùng `permitAll()` ngoài bốn endpoint auth public + health. Không để endpoint mới public ngoài ý muốn.
+
+### 6.18. Kết quả kiểm thử cuối Day 4
+
+```text
+Tests run: 107, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+Phân bổ test (tích lũy Day 3 + Day 4):
+
+```text
+Day 3 repository (14)
+Batch 1 security primitives (Argon2, SecureRefresh, Sha256, JwtAccessToken, AesGcm)
+Batch 2 authentication (Register, Login, AccessTokenAndMe, Refresh, RefreshConcurrency,
+                        Logout, OriginCors, ErrorContract, JwtAuthorities, CorsConfig)
++ context load + UserEncryptedPersonalData
+```
+
+Không xóa, không bỏ qua test cũ. Toàn bộ chạy qua `docker compose --profile test run --rm backend-test`.
+
+### 6.19. Technical debt đã ghi nhận (KHÔNG phải blocker Day 4)
+
+Các mục dưới đây đã được review và tài liệu hóa, KHÔNG chặn việc hoàn tất Day 4, sẽ xử lý theo thứ tự ưu tiên ở module sau:
+
+- Frontend BẮT BUỘC dùng single-flight refresh (queue các refresh đồng thời, dùng kết quả của request đầu) để tránh nhiều refresh song song cùng cookie gây false-positive reuse → revoke toàn family.
+- Lockout counter có lost-update khi nhiều login sai đồng thời (mỗi "batch" C request song song chỉ tăng 1). Cần atomic `UPDATE ... = failed_login_attempts + 1` hoặc pessimistic lock. Phải sửa trước khi tin dùng lockout làm biện pháp brute-force chính.
+- Register duplicate race (2 request cùng username/email đồng thời) có thể trả 500 thay vì 409 do chưa catch `DataIntegrityViolationException`. Happy path vẫn trả 409 đúng.
+- `@Transactional(noRollbackFor = AuthenticationException.class)` trên `RefreshService.refresh` đang rộng (áp cả method, không chỉ nhánh reuse). Đúng ở code hiện tại, nên thu hẹp (exception con riêng / `REQUIRES_NEW` / ném ngoài tx).
+- `User-Agent` dài hơn giới hạn `user_agent VARCHAR(500)` không được truncate → có thể gây lỗi persistence 500 ở login và refresh. Cần truncate trong `ClientContext`.
+
+Các mục trên KHÔNG được ghi là blocker Day 4.
+
 ---
 
 # 7. Chi tiết schema Identity V2
@@ -547,6 +682,8 @@ failed_login_attempts
 locked_until
 last_login_at
 password_changed_at
+phone_encrypted
+national_id_encrypted
 created_at
 updated_at
 ```
@@ -565,6 +702,7 @@ updated_at
 - `last_login_at`: nullable TIMESTAMPTZ
 - `password_changed_at`: NOT NULL, mặc định CURRENT_TIMESTAMP
 - Có `created_at`, `updated_at`
+- `phone_encrypted`, `national_id_encrypted`: nullable TEXT, chỉ lưu AES-256-GCM ciphertext có prefix `v1:` (thêm ở V5), có CHECK constraint bắt buộc prefix `v1:` cho mọi giá trị không NULL
 
 Giá trị status hợp lệ:
 
@@ -942,22 +1080,34 @@ Phân bổ test:
 
 Toàn bộ integration test chạy trên PostgreSQL Testcontainers thật, dùng dữ liệu role/permission do Flyway V3 seed.
 
+## 9.6. Kết quả kiểm thử cuối Day 4 (tích lũy authentication)
+
+Sau Day 4, toàn bộ test suite vẫn chạy trên PostgreSQL 17 Testcontainers:
+
+```text
+Tests run: 107, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+Test Day 4 bổ sung các lớp: Argon2 password hashing, secure refresh token generation, SHA-256 refresh token hashing, JWT access token, AES-256-GCM encryption, register, login, access token + `/me`, refresh rotation + reuse detection, refresh concurrency, logout, origin/CORS, error contract, JWT authorities, CORS config. Không xóa và không bỏ qua test Day 3.
+
 ---
 
 # 10. Git checkpoint hiện tại
 
 ## 10.1. Backend commit
 
-Commit hiện tại (HEAD):
+Day 4 backend checkpoint (HEAD):
 
 ```text
-0f83e2f feat(identity): add repository layer and integration tests
+d4b7fb5 feat(auth): complete authentication application and API
 ```
 
-Commit V3 trong lịch sử backend:
+Các commit trước trong lịch sử backend:
 
 ```text
-173bac6 feat(identity): seed roles and permissions
+0f83e2f feat(identity): add repository layer and integration tests   (Day 3)
+173bac6 feat(identity): seed roles and permissions                  (Day 2 / V3)
 ```
 
 Remote state:
@@ -966,50 +1116,55 @@ Remote state:
 backend/main == origin/main
 ```
 
-Backend commit `0f83e2f` đã được push lên remote mới `https://github.com/hhtuann/Quizopia_Backend.git`.
+Backend commit `d4b7fb5` đã được push lên remote `https://github.com/hhtuann/Quizopia_Backend.git`. Backend branch `main` đồng bộ với `origin/main` tại checkpoint kết thúc Day 4 (working tree sạch sau checkpoint).
 
 ## 10.2. Root commit
 
-Day 3 implementation checkpoint:
+Day 4 implementation checkpoint:
+
+```text
+ab0c195 chore(auth): finalize authentication backend checkpoint
+```
+
+Root commit `ab0c195` đã commit các thay đổi Day 4 sau:
+
+```text
+backend submodule pointer (trỏ tới backend commit d4b7fb5)
+docker-compose.yml (invite code blank → fail-fast)
+```
+
+Checkpoint trước (Day 3):
 
 ```text
 7d2b663 chore(project): finalize day 3 repository layer
 ```
 
-Root commit `7d2b663` đã commit các thay đổi Day 3 sau:
-
-```text
-backend submodule pointer (trỏ tới backend commit 0f83e2f)
-docker-compose.yml (có service backend-test)
-.gitmodules (dùng backend remote mới)
-QUIZOPIA_PROJECT_HANDOFF.md (cập nhật Day 3)
-```
-
-Remote state:
+Remote state tại thời điểm checkpoint Day 4:
 
 ```text
 main == origin/main
 ```
 
-Root commit `7d2b663` đã được push lên remote mới `https://github.com/hhtuann/Quizopia_System.git`. Root branch `main` đã đồng bộ với `origin/main` tại checkpoint kết thúc Day 3.
+Backend `d4b7fb5` và root `ab0c195` đều đã push và đồng bộ `origin/main`. Lưu ý: tài liệu Day 4 handoff này được cập nhật ở commit riêng nằm *sau* `ab0c195`, nên root HEAD hiện tại có thể mới hơn `ab0c195`. `ab0c195` vẫn là mốc implementation Day 4 cố định.
 
 ## 10.3. Local changes chưa commit
 
-Sau checkpoint Day 3 (`7d2b663`), backend submodule pointer, `docker-compose.yml`, `.gitmodules` và `QUIZOPIA_PROJECT_HANDOFF.md` đã được commit và không còn nằm trong nhóm thay đổi chưa commit. Các mục sau vẫn có thể tồn tại local và nằm ngoài phạm vi:
+Sau checkpoint Day 4 (`ab0c195`), `backend` submodule pointer và `docker-compose.yml` đã được commit. Backend working tree sạch. Các mục sau có thể vẫn tồn tại local ở root và nằm ngoài phạm vi Day 4:
 
 ```text
+ M .gitignore
  m frontend
-?? .claude/
-?? .gitignore
 ?? .vscode/
+?? agent-engineer-main/
 ```
 
 Ý nghĩa:
 
-- `frontend` có thay đổi local chưa commit.
-- `.claude/` chưa tracked.
-- `.gitignore` chưa tracked.
+- `.gitignore` có thay đổi local chưa commit (bảo vệ `.env`).
+- `frontend` (submodule) có thay đổi local chưa commit.
 - `.vscode/` chưa tracked.
+- `agent-engineer-main/` chưa tracked.
+- `.claude/` bị `.gitignore` loại trừ nên không xuất hiện trong `git status`.
 
 Không được stage hoặc commit các mục ngoài phạm vi sau nếu chưa có yêu cầu riêng:
 
@@ -1017,6 +1172,7 @@ Không được stage hoặc commit các mục ngoài phạm vi sau nếu chưa 
 .claude
 .gitignore
 .vscode
+agent-engineer-main
 frontend local changes
 ```
 
@@ -1059,9 +1215,9 @@ Bài học:
 
 ---
 
-# 12. Trạng thái hiện tại (Day 3 hoàn tất)
+# 12. Trạng thái hiện tại (Day 4 hoàn tất)
 
-Đã hoàn thành (tích lũy Day 1 → Day 3):
+Đã hoàn thành (tích lũy Day 1 → Day 4):
 
 - Docker Compose foundation
 - Backend Dockerfile
@@ -1077,14 +1233,18 @@ Bài học:
 - V3 seed roles & permissions đã áp dụng và kiểm chứng trực tiếp trong PostgreSQL
 - V4 thêm username no-`@` constraint
 - Identity Repository Layer (6 repository) đã hoàn thành
+- V5 thêm cột mã hóa AES-256-GCM cho phone/nationalId
+- Security primitives: Argon2id, AES-256-GCM, JWT HS256, opaque refresh token, Clock
+- Authentication backend: 5 endpoint (`register`, `login`, `refresh`, `logout`, `me`)
+- CORS allowlist + Origin check, error contract thống nhất, JWT authorities (role + permission)
 - Integration test chạy trên PostgreSQL 17 Testcontainers
-- 14 test, 0 failure, 0 error, 0 skipped, BUILD SUCCESS
-- Backend đã commit (`0f83e2f`) và push lên remote mới
-- Root đã commit (`7d2b663`) và push lên remote mới, đồng bộ `origin/main`
+- 107 test, 0 failure, 0 error, 0 skipped, BUILD SUCCESS
+- Backend đã commit (`d4b7fb5`) và push lên remote, đồng bộ `origin/main`
+- Root đã commit (`ab0c195`) và push lên remote, đồng bộ `origin/main`
 
-Flyway database hiện ở version 4. V1, V2, V3, V4 đều đã áp dụng và không được sửa nữa.
+Flyway database hiện ở version 5. V1, V2, V3, V4, V5 đều đã áp dụng và không được sửa nữa.
 
-Bước tiếp theo là Day 4 — Security Primitives (chưa triển khai).
+Bước tiếp theo là Day 5 — Question Bank và Excel Import (chưa triển khai).
 
 ---
 
@@ -1115,29 +1275,32 @@ Không sửa lại V3.
 
 Không sửa lại V1/V2/V3/V4.
 
-## Day 4 — Security Primitives (KẾ HOẠCH, chưa triển khai)
+## Day 4 — Authentication Backend (ĐÃ HOÀN THÀNH)
 
-Day 4 chưa được triển khai. Bước đầu Day 4 phải là review và chốt thiết kế trước khi code. Không tạo controller hoặc authentication endpoint ngay ở bước đầu Day 4.
+Đã hoàn thành trong Day 4 (chi tiết ở mục 6.14–6.19):
 
-Các chủ đề cần lần lượt thảo luận (theo thứ tự):
+- V5 mã hóa dữ liệu cá nhân AES-256-GCM.
+- Security primitives: Argon2id, AES-256-GCM, JWT HS256, opaque refresh token, Clock.
+- Năm endpoint authentication: `POST /api/auth/register|login|refresh|logout`, `GET /api/auth/me`.
+- Lockout 5 lần / 15 phút; access token JWT 15 phút; refresh token opaque qua cookie.
+- Refresh rotation + reuse detection revoke family.
+- CORS allowlist + Origin check; error contract `ApiError` thống nhất; JWT authorities (role + permission).
+- 107 test, 0 failure / 0 error / 0 skipped, BUILD SUCCESS trên PostgreSQL 17 Testcontainers.
+
+Các giá trị đã chốt trong Day 4:
 
 ```text
-PasswordHasher abstraction
-Argon2id configuration
-Opaque refresh token generation
-Refresh token hashing
-Access token JWT claims
-JWT signing key strategy cho development và production
-Access token lifetime
-Refresh token lifetime
-Lockout threshold
-Lockout duration
-Clock abstraction để test thời gian
+Password hashing       : Argon2id
+Sensitive data         : AES-256-GCM (phone, nationalId), prefix v1:
+Access token           : JWT HS256, 15 phút
+Refresh token          : opaque, 256-bit, chỉ lưu SHA-256 hash, HttpOnly cookie
+Lockout                : 5 lần sai liên tiếp trong 15 phút
+Clock                  : Clock abstraction (MutableClock trong test)
 ```
 
-Không tự quyết định các giá trị lifetime, lockout hoặc secret strategy nếu người dùng chưa chốt.
+Technical debt đã ghi nhận (KHÔNG phải blocker Day 4) nằm ở mục 6.19. Các Phase 5–9 dưới đây đã được triển khai trong Day 4; nội dung được giữ làm tham chiếu thiết kế.
 
-## Phase 5 — Security primitives
+## Phase 5 — Security primitives (ĐÃ HOÀN THÀNH trong Day 4)
 
 ### Password hashing
 
@@ -1188,7 +1351,7 @@ Access token:
 - Database chỉ lưu hash của token.
 - Không log refresh token plaintext.
 
-## Phase 6 — Authentication use cases
+## Phase 6 — Authentication use cases (ĐÃ HOÀN THÀNH trong Day 4)
 
 Các use case chính:
 
@@ -1256,7 +1419,7 @@ refresh token hash
 internal security fields không cần thiết
 ```
 
-## Phase 7 — Spring Security integration
+## Phase 7 — Spring Security integration (ĐÃ HOÀN THÀNH trong Day 4)
 
 Cần cấu hình:
 
@@ -1286,7 +1449,7 @@ Ví dụ:
 - STUDENT chỉ được thi exam mà mình được enroll và trong thời gian cho phép.
 - SYSTEM_ADMIN không tự động được sửa nội dung học thuật nếu không có permission tương ứng.
 
-## Phase 8 — API error model
+## Phase 8 — API error model (ĐÃ HOÀN THÀNH trong Day 4 — `ApiError`)
 
 Nên tạo error response thống nhất:
 
@@ -1309,7 +1472,7 @@ Không tiết lộ:
 - Stack trace production
 - SQL error chi tiết
 
-## Phase 9 — Tests bắt buộc
+## Phase 9 — Tests bắt buộc (ĐÃ HOÀN THÀNH trong Day 4 — 107 test pass)
 
 Cần test ít nhất:
 
@@ -1340,6 +1503,24 @@ Database assertions:
 - Token cũ bị revoked sau refresh.
 - Family bị revoke sau reuse.
 - `token_version` tăng sau logout-all.
+
+## Day 5 — Question Bank và Excel Import (KẾ HOẠCH tiếp theo, chưa triển khai)
+
+Day 5 chưa được triển khai trong nhiệm vụ cập nhật tài liệu này. Yêu cầu chốt cho Day 5:
+
+- Hỗ trợ đủ bốn loại câu hỏi:
+
+```text
+SINGLE_CHOICE
+MULTIPLE_CHOICE
+TRUE_FALSE_MATRIX
+NUMERIC_FILL
+```
+
+- Excel import phải validate từng dòng và báo lỗi rõ theo dòng (row-level error reporting), không im lặng bỏ dòng sai.
+- Bắt đầu Day 5 bằng review/chốt thiết kế schema question bank và định dạng Excel trước khi code, đúng nguyên tắc "một bước nhỏ mỗi lần".
+
+Không bắt đầu implementation Day 5 trong nhiệm vụ cập nhật tài liệu này.
 
 ## Phase 10 — Frontend authentication integration
 
@@ -1467,11 +1648,12 @@ V1__initialize_database.sql
 V2__create_identity_schema.sql
 V3__seed_roles_and_permissions.sql
 V4__add_username_format_constraint.sql
+V5__add_encrypted_personal_data.sql
 ```
 
-Flyway database hiện ở version 4.
+Flyway database hiện ở version 5.
 
-Migration tiếp theo (nếu cần schema mới) phải là V5 trở đi, không sửa V1/V2/V3/V4.
+Migration tiếp theo (nếu cần schema mới) phải là V6 trở đi, không sửa V1/V2/V3/V4/V5.
 
 ---
 
@@ -1538,14 +1720,14 @@ docker compose ps
 
 Sau đó kiểm tra:
 
-- Root đang ở commit `7d2b663` hoặc commit mới hơn hợp lệ.
-- Backend đang ở `0f83e2f` hoặc commit mới hơn hợp lệ.
-- Root `main` đồng bộ với `origin/main` tại checkpoint kết thúc Day 3.
-- Không có thay đổi backend chưa rõ nguồn gốc.
+- Root đang ở commit `ab0c195` (Day 4 implementation checkpoint) hoặc commit mới hơn hợp lệ.
+- Backend đang ở `d4b7fb5` (Day 4 backend checkpoint) hoặc commit mới hơn hợp lệ.
+- Root `main` đồng bộ với `origin/main` tại checkpoint kết thúc Day 4.
+- Không có thay đổi backend chưa rõ nguồn gốc (backend working tree nên sạch).
 - Frontend vẫn có thể hiện `m frontend`.
-- `.claude/`, `.gitignore` và `.vscode/` vẫn có thể untracked.
+- `.gitignore`, `.vscode/`, `agent-engineer-main/` có thể chưa commit; `.claude/` bị gitignore loại trừ nên không xuất hiện trong `git status`.
 - Docker services ở trạng thái hợp lý.
-- Flyway database hiện ở version 4.
+- Flyway database hiện ở version 5.
 
 Không nên giả định repository vẫn đúng trạng thái nếu chưa kiểm tra các lệnh trên.
 
@@ -1569,8 +1751,8 @@ Yêu cầu làm việc:
 - Backend và frontend là Git submodule.
 - Dự án chạy 100% Docker.
 - Flyway là nguồn sự thật cho schema.
-- Không sửa V1, V2, V3 hoặc V4.
-- Bước tiếp theo hiện tại là Day 4 — Security Primitives (chưa triển khai). Bước đầu là review và chốt thiết kế, không code controller.
+- Không sửa V1, V2, V3, V4 hoặc V5.
+- Day 4 Authentication Backend đã hoàn tất (107 test pass). Bước tiếp theo hiện tại là Day 5 — Question Bank và Excel Import (chưa triển khai). Bước đầu là review/chốt thiết kế schema và định dạng Excel, chưa code controller.
 - Khi viết prompt cho coding agent, dùng @File.java để tôi tag file.
 - Trước khi bắt đầu, hãy yêu cầu tôi kiểm tra Git status, branch và Docker state.
 ```
@@ -1582,37 +1764,26 @@ Yêu cầu làm việc:
 Điểm tiếp theo:
 
 ```text
-Day 4 — Security Primitives
+Day 5 — Question Bank và Excel Import
 ```
 
-Day 4 chưa được triển khai. Bước đầu Day 4 phải là review và chốt thiết kế trước khi code. Không tạo controller hoặc authentication endpoint ngay ở bước đầu Day 4.
+Day 5 chưa được triển khai. Day 4 Authentication Backend đã hoàn tất (107 test pass). Bước đầu Day 5 phải là review và chốt thiết kế (schema question bank + định dạng Excel) trước khi code.
 
-Các chủ đề cần lần lượt thảo luận trước khi code:
+Yêu cầu chốt cho Day 5:
 
 ```text
-PasswordHasher abstraction
-Argon2id configuration
-Opaque refresh token generation
-Refresh token hashing
-Access token JWT claims
-JWT signing key strategy cho development và production
-Access token lifetime
-Refresh token lifetime
-Lockout threshold
-Lockout duration
-Clock abstraction để test thời gian
+Hỗ trợ đủ bốn loại câu hỏi: SINGLE_CHOICE, MULTIPLE_CHOICE, TRUE_FALSE_MATRIX, NUMERIC_FILL
+Excel import phải validate và báo lỗi từng dòng (row-level error reporting)
 ```
 
-Không tự quyết định các giá trị lifetime, lockout hoặc secret strategy nếu người dùng chưa chốt.
-
-Trình tự đúng để bắt đầu Day 4:
+Trình tự đúng để bắt đầu Day 5:
 
 1. Kiểm tra Git và Docker state.
-2. Xác nhận Flyway đang ở version 4 (V1–V4 đã áp dụng).
-3. Xác nhận 6 repository Day 3 và 14 test đang pass.
-4. Review và chốt thiết kế security primitives với người dùng theo danh sách chủ đề trên.
-5. Chỉ sau khi chốt mới bắt đầu code (PasswordHasher, token generation, hashing, clock...).
-6. Không bắt đầu Day 4 bằng việc tạo controller hoặc authentication endpoint.
+2. Xác nhận Flyway đang ở version 5 (V1–V5 đã áp dụng).
+3. Xác nhận 6 repository Day 3 + authentication backend Day 4 và 107 test đang pass.
+4. Review và chốt thiết kế question bank schema + định dạng Excel với người dùng.
+5. Chỉ sau khi chốt mới bắt đầu code.
+6. Không bắt đầu Day 5 bằng việc tạo controller/API endpoint ngay.
 
 Giữ nguyên các nguyên tắc authorization:
 
@@ -1628,16 +1799,19 @@ Giữ nguyên các nguyên tắc authorization:
 
 Không được tự giả định các nội dung sau nếu chưa đọc repository hiện tại:
 
-- API endpoint path cuối cùng
-- JWT library cuối cùng
-- Thời gian sống access token
-- Thời gian sống refresh token
-- Lockout threshold
-- Lockout duration
-- Cookie hay Authorization header cho refresh token
+- Refresh token lifetime chính xác (giá trị cụ thể)
 - CORS origins production
 - Production secret management
 - Frontend local changes hiện có là gì
+
+Đã được xác nhận qua Day 4 (kiểm chứng trong code nếu cần):
+
+- API endpoint path cuối cùng: `POST /api/auth/{register,login,refresh,logout}` và `GET /api/auth/me`
+- JWT library: Spring Security OAuth2 resource server, ký HS256
+- Access token lifetime: 15 phút
+- Lockout threshold: 5 lần sai liên tiếp
+- Lockout duration: 15 phút
+- Refresh token: opaque, gửi qua HttpOnly cookie `quizopia_refresh` (DB chỉ lưu hash)
 
 Lưu ý: Danh sách permission code cuối cùng ĐÃ được xác nhận tại `docs/security.md` và seed tại V3 (4 role, 84 permission, mapping 13/51/46/9). Không tự ý thêm permission hoặc role ngoài catalog này.
 
@@ -1651,16 +1825,18 @@ Dự án đã hoàn thành nền tảng quan trọng nhất:
 
 - Hạ tầng Docker
 - PostgreSQL và Redis
-- Flyway (hiện version 4)
-- Identity schema (V2) và V4 username no-`@` constraint
+- Flyway (hiện version 5)
+- Identity schema (V2), V4 username no-`@` constraint, V5 mã hóa AES-256-GCM cho phone/nationalId
 - JPA model (9 file)
 - Permission catalog và role-permission matrix đã chốt (`docs/security.md`)
 - V3 seed roles & permissions đã áp dụng và kiểm chứng trực tiếp trong PostgreSQL
 - Identity Repository Layer (6 repository)
-- Integration test trên PostgreSQL 17 Testcontainers (14 test, 0 failure)
+- Security primitives (Argon2id, AES-256-GCM, JWT HS256, opaque refresh token, Clock)
+- Authentication backend: 5 endpoint + CORS + origin check + error contract thống nhất + JWT authorities
+- Integration test trên PostgreSQL 17 Testcontainers (107 test, 0 failure)
 - Validation giữa code và database
-- Git checkpoint backend (`0f83e2f`) và root (`7d2b663`) đều đã push lên remote mới, đồng bộ `origin/main`
+- Git checkpoint backend (`d4b7fb5`) và root (`ab0c195`) đều đã push và đồng bộ `origin/main`
 
 Permission model đã được chốt đúng ở V3: 4 role, 84 permission, mapping 13/51/46/9, không `PROCTOR`, không `ATTEMPT_CANCEL`.
 
-Bước tiếp theo là Day 4 — Security Primitives, bắt đầu bằng review và chốt thiết kế (PasswordHasher, Argon2id, token generation/hashing, JWT claims, signing key, lifetime, lockout, clock), không bắt đầu bằng việc code controller.
+Bước tiếp theo là Day 5 — Question Bank và Excel Import, hỗ trợ đủ bốn loại câu hỏi (SINGLE_CHOICE, MULTIPLE_CHOICE, TRUE_FALSE_MATRIX, NUMERIC_FILL) và Excel import validate/báo lỗi từng dòng. Bắt đầu bằng review và chốt thiết kế, không bắt đầu bằng việc code controller.
