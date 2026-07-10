@@ -182,8 +182,8 @@ WHERE LOWER(u.username) = LOWER(v.username) AND LOWER(s.code) = 'demo-school'
 --   Q TRUE_FALSE_MATRIX  : 4 statements A-D.                   max 2 pt
 --   Q NUMERIC_FILL       : expectedAnswer "1.00" (4 chars).    max 1 pt
 -- Total exam max = 6.00.
--- NUMERIC_FILL answer_key: {"expectedAnswer":"1.00","requiredInputLength":4,
---                            "roundingInstruction":"Two decimal places"}
+-- NUMERIC_FILL answer_key: {"expectedAnswer":"1.00"} (V12: requiredInputLength +
+--                            roundingInstruction removed; rounding hint is in the content)
 -- Grading uses BigDecimal.compareTo, so 1.00 == 1 == 1.0 numerically.
 -- ============================================================
 
@@ -263,10 +263,10 @@ WHERE LOWER(qb.code) = 'demo_qb_java' AND LOWER(q.code) = 'demo_q_tf'
 -- NUMERIC_FILL (answer_key required; expectedAnswer must be exactly 4 chars per schema CHECK)
 INSERT INTO question_versions (question_id, version_number, question_type, content, explanation, difficulty, default_points, answer_key, metadata, created_by)
 SELECT q.id, 1, 'NUMERIC_FILL',
-       '[DEMO] Compute 0.50 + 0.50. Enter the result as a 4-character number (e.g. 1.00).',
+       '[DEMO] Compute 0.50 + 0.50. Enter the result as a 4-character number with two decimal places (e.g. 1.00).',
        '[DEMO] Grading compares numerically with BigDecimal.compareTo (1.00 == 1).',
        'EASY', 1.00,
-       '{"expectedAnswer":"1.00","requiredInputLength":4,"roundingInstruction":"Two decimal places"}'::jsonb,
+       '{"expectedAnswer":"1.00"}'::jsonb,
        '{}'::jsonb, u.id
 FROM questions q
 JOIN question_banks qb ON qb.id = q.question_bank_id
@@ -410,7 +410,7 @@ WHERE ev.version_number = 1
 -- NUMERIC_FILL (position 3, points 1) — answer_key copied into the snapshot.
 INSERT INTO exam_questions (exam_version_id, exam_section_id, source_question_id, source_question_version_id, question_code, question_type, content, default_points, difficulty, explanation, answer_key, metadata, position)
 SELECT ev.id, es.id, q.id, qv.id, 'DEMO_Q_NF', 'NUMERIC_FILL', qv.content, 1.00, qv.difficulty, qv.explanation,
-       '{"expectedAnswer":"1.00","requiredInputLength":4,"roundingInstruction":"Two decimal places"}'::jsonb,
+       '{"expectedAnswer":"1.00"}'::jsonb,
        '{}'::jsonb, 3
 FROM exam_versions ev
 JOIN exams e          ON e.id = ev.exam_id       AND LOWER(e.code) = 'demo_exam_java'
