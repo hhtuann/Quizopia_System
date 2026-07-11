@@ -63,6 +63,9 @@ services:
       QUIZOPIA_TEACHER_INVITE_CODE: ${QUIZOPIA_TEACHER_INVITE_CODE:-}
       QUIZOPIA_ALLOWED_ORIGINS: ${QUIZOPIA_ALLOWED_ORIGINS:-http://localhost:3000}
       QUIZOPIA_COOKIE_SECURE: ${QUIZOPIA_COOKIE_SECURE:-false}
+      # Seed demo accounts (1 per role) + demo classroom on first startup.
+      # Leave false for production. See README "Demo accounts".
+      QUIZOPIA_DEMO_DATA_ENABLED: ${QUIZOPIA_DEMO_DATA_ENABLED:-false}
 
     ports:
       - "8080:8080"
@@ -80,11 +83,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* phải được inject LÚC BUILD để Next.js inline vào client bundle.
+        # Phải là URL browser-reachable (localhost:8080), KHÔNG phải hostname nội bộ Docker.
+        NEXT_PUBLIC_API_URL: http://localhost:8080
     container_name: quizopia_frontend
     restart: unless-stopped
 
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8080
+      NEXT_PUBLIC_API_URL: http://localhost:8080
 
     ports:
       - "3000:3000"
