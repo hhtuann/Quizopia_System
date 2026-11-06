@@ -21,15 +21,19 @@ Exit status: 0 on success; 1 on usage or git errors (reported to stderr).
 from __future__ import annotations
 
 import html
-import os
+import shutil
 import subprocess
 import sys
+import urllib.parse
 from pathlib import Path
 
 
 def run_git(cwd: str, *args: str) -> str:
+    # -c core.quotePath=false keeps non-ASCII filenames literal (git would
+    # otherwise emit quoted "\346..." forms that corrupt paths and links).
     result = subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=False
+        ["git", "-c", "core.quotePath=false", *args],
+        cwd=cwd, capture_output=True, text=True, check=False
     )
     if result.returncode != 0:
         sys.stderr.write(f"git {' '.join(args)} in {cwd}: {result.stderr.strip()}\n")
@@ -39,7 +43,7 @@ def run_git(cwd: str, *args: str) -> str:
 
 def github_blob_base(remote_url: str, commit: str) -> str:
     """Normalize any supported remote URL to an https blob base for a commit."""
-    url = remote_url.strip()
+    url = remote_url.strip().rstrip("/")
     if url.startswith("git@"):
         # git@github.com:owner/repo.git -> github.com/owner/repo
         url = url.split("@", 1)[1].replace(":", "/")
@@ -52,20 +56,33 @@ def github_blob_base(remote_url: str, commit: str) -> str:
     return f"{url}/blob/{commit}"
 
 
+def submodule_paths(repo_root: Path) -> list[str]:
+    """Submodule paths declared in .gitmodules (nothing hardcoded)."""
+    listing = run_git(str(repo_root), "config", "-f", ".gitmodules", "--get-regexp", r"^submodule\..*\.path$")
+    return [line.split(" ", 1)[1] for line in listing.splitlines() if " " in line]
+
+
 def collect_documents(repo_root: Path) -> list[dict]:
     """Every tracked Markdown file in the parent and each submodule.
 
     Returns [{repo, path (repo-relative), url, title}], sorted by repo then
     path. Untracked/ignored files are excluded (git ls-files), matching what
-    CI actually integrates.
+    CI actually integrates. A submodule declared in .gitmodules but not
+    checked out produces a stderr warning (its section is skipped) instead
+    of a silently incomplete index.
     """
     docs: list[dict] = []
 
     repos: list[tuple[str, Path]] = [("Quizopia_System", repo_root)]
-    for name in ("backend", "frontend"):
+    for name in submodule_paths(repo_root):
         child = repo_root / name
         if (child / ".git").exists():
             repos.append((name, child))
+        else:
+            sys.stderr.write(
+                f"warning: submodule '{name}' is declared but not checked out — "
+                f"its documents are excluded from the index\n"
+            )
 
     for repo_name, repo_path in repos:
         commit = run_git(str(repo_path), "rev-parse", "HEAD")
@@ -79,7 +96,8 @@ def collect_documents(repo_root: Path) -> list[dict]:
                 {
                     "repo": repo_name,
                     "path": rel,
-                    "url": f"{blob_base}/{rel}",
+                    # Percent-encode per segment so spaces/#/? in names stay one link.
+                    "url": f"{blob_base}/{urllib.parse.quote(rel, safe='/')}",
                     # Pretty title: last path segment, extension stripped.
                     "title": Path(rel).stem,
                 }
@@ -105,8 +123,8 @@ PAGE = """<!DOCTYPE html>
   li {{ padding: .3rem 0 .3rem 0; }}
   a {{ color: #0052ff; text-decoration: none; }}
   a:hover {{ text-decoration: underline; }}
-  .path {{ color: #94a3b8; font-family: ui-monospace, monospace; font-size: .8rem; }}
-  footer {{ color: #94a3b8; font-size: .8rem; margin-top: 3rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; }}
+  .path {{ color: #64748b; font-family: ui-monospace, monospace; font-size: .8rem; }}
+  footer {{ color: #64748b; font-size: .8rem; margin-top: 3rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; }}
   @media (prefers-color-scheme: dark) {{
     body {{ background: #0b1120; color: #e2e8f0; }}
     h2 {{ color: #94a3b8; }} a {{ color: #4d7cff; }}
@@ -182,12 +200,12 @@ def main() -> int:
         sys.stderr.write("no Markdown documents found — refusing to publish an empty index\n")
         return 1
 
-    out_dir.mkdir(parents=True, exist_ok=True)
-    # 1. Curated hub copied verbatim.
-    for source in sorted((repo_root / "website").iterdir()):
-        if source.is_file():
-            target = out_dir / source.name
-            target.write_bytes(source.read_bytes())
+    hub = repo_root / "website"
+    if not hub.is_dir():
+        sys.stderr.write(f"{hub} does not exist — nothing to publish\n")
+        return 1
+    # 1. Curated hub copied verbatim — INCLUDING subdirectories (assets etc.).
+    shutil.copytree(hub, out_dir, dirs_exist_ok=True)
     # 2. Generated full index (overwrite any stale copy from website/).
     (out_dir / "all-docs.html").write_text(render_page(docs), encoding="utf-8")
 
