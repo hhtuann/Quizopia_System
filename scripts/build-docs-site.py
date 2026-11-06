@@ -128,7 +128,8 @@ PAGE = """<!DOCTYPE html>
   @media (prefers-color-scheme: dark) {{
     body {{ background: #0b1120; color: #e2e8f0; }}
     h2 {{ color: #94a3b8; }} a {{ color: #4d7cff; }}
-    footer {{ border-color: #1e293b; }}
+    .path {{ color: #94a3b8; }}
+    footer {{ color: #94a3b8; border-color: #1e293b; }}
   }}
 </style>
 </head>
