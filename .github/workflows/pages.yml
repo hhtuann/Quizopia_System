@@ -1,0 +1,92 @@
+name: Pages
+
+# Explicit documentation deployment for Quizopia_System (issue #11).
+#
+# Replaces GitHub's auto-provisioned legacy Jekyll build (source: main root),
+# which processed the ENTIRE monorepo — including both submodule source
+# trees — and failed on a non-UTF-8 byte in backend/docs/adr/ADR-001. The
+# published site is scoped to the parent's website/ hub plus a generated index
+# that LINKS to child documentation at the integrated commits; document
+# content is never parsed, so child-doc encoding can never break the build.
+# A dedicated validation step still fails loudly (with per-file positions)
+# if any tracked Markdown/HTML in the tree ever becomes non-UTF-8 again.
+#
+# Deploy runs only for main; pull requests run the full build+validate path
+# so the PR check is meaningful without deploying.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with both submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Validates every TEXT INPUT of this deployment: the parent's tracked
+      # text files (the website/ hub is embedded verbatim into the artifact).
+      # `git ls-files` at the parent root deliberately EXCLUDES submodule
+      # contents — under this architecture child documents are linked, never
+      # parsed or copied, so their encoding cannot break the build (and child
+      # docs must not redden System CI; see issue #11 history).
+      - name: Validate Pages inputs are valid UTF-8
+        run: |
+          python3 - <<'PY'
+          import subprocess, sys
+          files = [
+              f for f in subprocess.run(
+                  ["git", "ls-files", "*.md", "*.markdown", "*.html", "*.txt"],
+                  capture_output=True, text=True, check=True).stdout.splitlines()
+              # Skip submodule gitlink entries (they are directories, not files).
+              if not f.endswith(("/", "backend", "frontend"))
+          ]
+          bad = []
+          for path in files:
+              data = open(path, "rb").read()
+              try:
+                  data.decode("utf-8")
+              except UnicodeDecodeError as err:
+                  bad.append(f"{path}: byte 0x{data[err.start]:02x} at offset {err.start}: {err.reason}")
+          if bad:
+              print("::error::Non-UTF-8 text files found (these break text pipelines like the Pages build)")
+              for line in bad:
+                  print(f"::error file={line.split(':')[0]}::{line}")
+              sys.exit(1)
+          print(f"UTF-8 validation passed for {len(files)} tracked text files.")
+          PY
+
+      - name: Build documentation site
+        run: python3 scripts/build-docs-site.py "$PWD" "$PWD/site"
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
