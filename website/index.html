@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quizopia System — Documentation</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.6; color: #0f172a; background: #fafafa;
+  }
+  main { max-width: 60rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  h1 { font-size: 2rem; letter-spacing: -0.02em; margin: 0 0 .25rem; }
+  h1 span { color: #0052ff; }
+  .tagline { color: #64748b; margin: 0 0 2rem; }
+  h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: .08em; color: #64748b; margin: 2.25rem 0 .75rem; }
+  .card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem;
+    padding: 1rem 1.25rem; margin: .5rem 0;
+  }
+  .card h3 { margin: 0 0 .25rem; font-size: 1rem; }
+  .card p { margin: 0; color: #475569; font-size: .92rem; }
+  a { color: #0052ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .repos { display: grid; gap: .5rem; }
+  .badge {
+    display: inline-block; font-size: .72rem; font-weight: 600; color: #64748b;
+    border: 1px solid #e2e8f0; border-radius: 999px; padding: .05rem .6rem; margin-left: .5rem;
+    vertical-align: middle;
+  }
+  footer { color: #64748b; font-size: .8rem; margin-top: 3rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; }
+  @media (prefers-color-scheme: dark) {
+    footer { color: #94a3b8; }
+    .card { background: #111a2e; border-color: #1e293b; }
+    .card p { color: #94a3b8; }
+    h2 { color: #94a3b8; }
+    a { color: #4d7cff; }
+    footer { border-color: #1e293b; }
+    .badge { color: #94a3b8; border-color: #1e293b; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Quizopia <span>System</span></h1>
+  <p class="tagline">Documentation hub — quiz-taking platform monorepo (Java 21 · Spring Boot 4 · PostgreSQL 17 · Next.js 16)</p>
+
+  <h2>Repository map</h2>
+  <div class="repos">
+    <div class="card">
+      <h3><a href="https://github.com/hhtuann/Quizopia_System">Quizopia_System</a><span class="badge">orchestration</span></h3>
+      <p>Parent repository: submodule pointers, environment templates (<code>.env.example</code>), <a href="https://github.com/hhtuann/Quizopia_System/blob/main/docker-compose.yml">docker-compose stack</a>, and the phase tracking issues.</p>
+    </div>
+    <div class="card">
+      <h3><a href="https://github.com/hhtuann/Quizopia_Backend">Quizopia_Backend</a><span class="badge">Java 21 API</span></h3>
+      <p>Spring Boot monolith: identity, workspaces, question banks (Excel + Quiz Markdown import), exams, sessions, attempts, grading, realtime (STOMP).</p>
+    </div>
+    <div class="card">
+      <h3><a href="https://github.com/hhtuann/Quizopia_Frontend">quizopia_frontend</a><span class="badge">Next.js 16 UI</span></h3>
+      <p>Student/teacher/admin web app: Markdown authoring, exam taking, session monitoring, roster import, reporting.</p>
+    </div>
+  </div>
+
+  <h2>Start here</h2>
+  <div class="card">
+    <h3><a href="https://github.com/hhtuann/Quizopia_System/blob/main/README.md">System README</a></h3>
+    <p>Architecture overview, repository layout, and how the three repositories fit together.</p>
+  </div>
+  <div class="card">
+    <h3><a href="https://github.com/hhtuann/Quizopia_System/blob/main/docker-compose.yml">Local stack (docker-compose)</a></h3>
+    <p>PostgreSQL 17 + Redis + Mailpit + backend + frontend for local development; pair with <code>.env.example</code>.</p>
+  </div>
+
+  <h2>Architecture decisions &amp; runbooks</h2>
+  <div class="card">
+    <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/adr/ADR-001-phase1-workspace-exam-redesign.md">ADR-001 — Phase 1 workspace &amp; exam redesign</a></h3>
+    <p>Public platform foundation: workspaces/organizations/memberships and the one-exam-one-content model.</p>
+  </div>
+  <div class="card">
+    <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/adr/ADR-002-identity-m1-m2.md">ADR-002 — Identity M1/M2</a></h3>
+    <p>Registration, OTP verification, teacher self-upgrade, dual-role identity and view switching.</p>
+  </div>
+  <div class="card">
+    <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/adr/ADR-003-p2-c-markdown-question-import.md">ADR-003 — Quiz Markdown Question Bank import (P2-C)</a></h3>
+    <p>Teacher-only Markdown import: validation contract (#10), workspace authorization boundary, atomicity and limits.</p>
+  </div>
+  <div class="card">
+    <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/markdown-question-bank-mapping.md">Quiz Markdown → Question Bank mapping</a></h3>
+    <p>Field-level mapping from the Markdown grammar to the question domain, with the resolved cross-layer contract.</p>
+  </div>
+  <div class="card">
+    <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/e2e-local.md">Local E2E recipe</a></h3>
+    <p>Reproducible throwaway stack (Postgres/Redis/Mailpit + jar + Next dev) for browser end-to-end verification.</p>
+  </div>
+
+  <h2>Frontend design</h2>
+  <div class="card">
+    <h3><a href="https://github.com/hhtuann/Quizopia_Frontend/blob/main/DESIGN.md">DESIGN.md</a></h3>
+    <p>Minimalist-modern design system: tokens, typography, components, accessibility rules.</p>
+  </div>
+
+  <h2>Everything else</h2>
+  <div class="card">
+    <h3><a href="all-docs.html">Full document index</a></h3>
+    <p>Auto-generated on every deployment: every Markdown document across the System, Backend and Frontend repositories at their integrated submodule commits.</p>
+  </div>
+
+  <footer>
+    Quizopia System documentation — deployed from the <code>website/</code> directory by the
+    <a href="https://github.com/hhtuann/Quizopia_System/blob/main/.github/workflows/pages.yml">Pages workflow</a>.
+    Content lives single-source in the repositories; this page links to canonical GitHub renderings.
+  </footer>
+</main>
+</body>
+</html>
