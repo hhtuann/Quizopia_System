@@ -55,11 +55,11 @@
     </div>
     <div class="card">
       <h3><a href="https://github.com/hhtuann/Quizopia_Backend">Quizopia_Backend</a><span class="badge">Java 21 API</span></h3>
-      <p>Spring Boot monolith: identity, workspaces, question banks (Excel + Quiz Markdown import), exams, sessions, attempts, grading, realtime (STOMP).</p>
+      <p>Spring Boot monolith: identity, question banks (Excel + Quiz Markdown import), exams, sessions, attempts, grading, realtime (STOMP).</p>
     </div>
     <div class="card">
       <h3><a href="https://github.com/hhtuann/Quizopia_Frontend">quizopia_frontend</a><span class="badge">Next.js 16 UI</span></h3>
-      <p>Student/teacher/admin web app: Markdown authoring, exam taking, session monitoring, roster import, reporting.</p>
+      <p>Student/teacher web app: Markdown authoring, exam taking, session monitoring, roster import, reporting.</p>
     </div>
   </div>
 
@@ -75,8 +75,12 @@
 
   <h2>Architecture decisions &amp; runbooks</h2>
   <div class="card">
-    <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/adr/ADR-001-phase1-workspace-exam-redesign.md">ADR-001 — Phase 1 workspace &amp; exam redesign</a></h3>
-    <p>Public platform foundation: workspaces/organizations/memberships and the one-exam-one-content model.</p>
+    <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/adr/ADR-005-remove-organization-workspace.md">ADR-005 — Remove Organization &amp; Workspace (user-centric model)</a></h3>
+    <p>Resources belong directly to users (STUDENT/TEACHER); server-side ownership checks, global academic catalog, migration strategy.</p>
+  </div>
+  <div class="card">
+    <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/adr/ADR-001-phase1-workspace-exam-redesign.md">ADR-001 — Phase 1 exam redesign (workspace foundation superseded by ADR-005)</a></h3>
+    <p>The one-exam-one-content model; the workspace/organization foundation was later removed by ADR-005.</p>
   </div>
   <div class="card">
     <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/adr/ADR-002-identity-m1-m2.md">ADR-002 — Identity M1/M2</a></h3>
@@ -84,7 +88,7 @@
   </div>
   <div class="card">
     <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/adr/ADR-003-p2-c-markdown-question-import.md">ADR-003 — Quiz Markdown Question Bank import (P2-C)</a></h3>
-    <p>Teacher-only Markdown import: validation contract (#10), workspace authorization boundary, atomicity and limits.</p>
+    <p>Teacher-only Markdown import: validation contract (#10), bank-ownership authorization boundary, atomicity and limits.</p>
   </div>
   <div class="card">
     <h3><a href="https://github.com/hhtuann/Quizopia_Backend/blob/main/docs/markdown-question-bank-mapping.md">Quiz Markdown → Question Bank mapping</a></h3>
