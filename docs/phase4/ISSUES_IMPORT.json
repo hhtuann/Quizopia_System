@@ -1,0 +1,403 @@
+{
+  "status": "PUBLISHED_ON_GITHUB_ARCHIVE_DO_NOT_REIMPORT",
+  "source_baseline": {
+    "system": "86cdb2e",
+    "backend": "972d6a9",
+    "frontend": "7a01090",
+    "note": "revalidated GitHub main 2026-11-14 (unchanged from 2026-11-13 snapshot)"
+  },
+  "issues": [
+    {
+      "key": "P4-EPIC",
+      "title": "[P4-EPIC] Phase 4 — Exam Monitoring, Activity Tracking & AI Proctoring",
+      "repository": "hhtuann/Quizopia_System",
+      "body": "\n**Background:** Extend Quizopia's Modular Monolith with durable Attempt activities, server-verified WebRTC camera monitoring, independent AI detection and evidence (snapshot, full recording, bounded clips), unified teacher review/report. Approved product architecture: self-hosted LiveKit, one room/Session, class-restricted only, full recording OFF by default, MinIO dev/S3 prod, 30d evidence/90d activity, camera-loss never destroys Attempt, independent AI adapters and later approved AI submodule.\n\n**Scope:** P4-0 architecture/model audit and demo safety/privacy baseline; P4-A monitoring foundation; P4-B camera; P4-C real AI; P4-D evidence/recording/retention; P4-E unified dashboard/review; P4-F hardening/benchmarks. **Non-goals:** automatic cheating verdicts; PUBLIC monitoring; direct grade mutation from AI; deploying without authorization.\n\n**Global acceptance criteria:**\n- [ ] Teacher enables monitoring on assigned `CLASS_RESTRICTED` Session; Backend rejects `PUBLIC`/zero-class.\n- [ ] Learner completes genuine server-verified camera preflight before **new** monitored Attempt.\n- [ ] Teacher sees authorized live cameras, student isolation enforced, reconnect and outages are visible without autosave/submit regression.\n- [ ] Real model phone/person detections are versioned, grouped, tested separately from fake worker, and alerts delivered durably.\n- [ ] Evidence image, optional full recording and clips from full video or rolling buffer work; assets private, auditable and time-bounded.\n- [ ] Timeline captures browser/server events, accepted answer history and AI/media/recording provenance, survives reload and reconnect.\n- [ ] Teacher reviews alerts/false positives, sees report without any automatic misconduct verdict.\n- [ ] 30d media/evidence and 90d activity retention, no P0/P1/P2 functional/security blockers; real 5-camera demo and optional 10-camera stress run measured and documented.\n\n**Definition of Done:** all child issues independently reviewed, documented feature flags and model versions, Testcontainers/FE tests and real media E2E green on exact PR HEADs; academic-demo security/safety checklist and repeatable showcase runbook; owner controls separate merge and deployment gates.\n\n**Architecture constraints:** Keep existing Attempt SQL conditional UPSERT and lock ordering; Spring remains authority for security and grades; only WebRTC carries video, not REST/STOMP; no Kafka/K8s/Elastic without measurement; all sensitive assets private; no AI penalty decisions.\n\n**Milestone dependency map:** `P4-0 → P4-A → P4-B → P4-C / P4-D (parallel where safe) → P4-E → P4-F`; actual child dependencies listed below. \n\n\n**Academic scope update (2026-11-14):** Course project, **not for real-student deployment**. Mandatory: 5 simultaneous real camera publishers (target 10), 1 teacher dashboard, real-model PHONE/MULTIPLE_PERSONS alerts, snapshot + clip, full recording ON and OFF, persisted activity/answer timeline and teacher report. 30/50/100 camera scale, production legal paperwork and enterprise HA are future/stretch work, **not completion blockers**. Use consenting adults or approved/synthetic footage, show a notice, protect stored video, and keep 30/90 day retention.\n",
+      "labels_suggested": [
+        "phase-4",
+        "epic"
+      ],
+      "published_issue_number": 77,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/77",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-0.1",
+      "title": "[P4-0.1] Finalize ADR-008, API contracts, demo scope and threat model",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [],
+      "body": "**Milestone:** P4-0 | **Priority:** P0 | **Dependencies:** none\n\n### Background / Scope\nApprove stable product invariants, architecture/contract docs, compatibility plan, data classification, retention and risk register; no implementation yet.\n\n### Backend\nCheck current API shape, auth permissions, migration version, attempt lock-order and error code conventions.\n\n### Frontend\nAudit `DESIGN.md`, policy notices, supported browsers and teacher/student session routes.\n\n### Media / AI / Ops\nValidate LiveKit self-host token revocation limitation, camera-notice, consenting demo volunteers, S3/TURN/Egress infrastructure assumptions.\n\n### Acceptance Criteria\n- [ ] ADR-008 and versioned API/event specs have explicit owner sign-off\n- [ ] Scope contains camera, tracking, AI, snapshot, video, clips and unified timeline\n- [ ] Document explicit failure policy and academic-demo limitations and deferred production obligations\n- [ ] No repo/infra changes performed by this ticket\n\n### Security & Privacy\nDemo notice, authorization, no audio, access audit, 30/90 retention and approved adult/synthetic camera footage documented; high residual self-host token risk recorded.\n\n### Tests & Evidence\nDocument review traceability to baseline main SHA, replay a threat-model tabletop and trace Session + Attempt state transitions.\n\n### DoD / Review Gate\nPrincipal architect + security reviewer; architecture PO gate. Formal production legal audit not required for course demo.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-0",
+        "priority:P0"
+      ],
+      "published_issue_number": 78,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/78",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-0.2",
+      "title": "[P4-0.2] Audit real phone/person models and design gaze-compatible adapter contract",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-0.1"
+      ],
+      "body": "**Milestone:** P4-0 | **Priority:** P0 | **Dependencies:** P4-0.1\n\n### Background / Scope\nIngest owner-provided AI model repo/artifacts, inspect I/O and runtime, benchmark representative media and decide threshold evaluation protocol.\n\n### Backend\nDefine trusted callback and media-binding event envelope; no Attempt/Grade mutation.\n\n### Frontend\nList UI categories and honest unsupported/disabled states (gaze stays OFF until validated).\n\n### Media / AI / Ops\nDocument hardware, frames, FPS, batching, GPU VRAM, false positives/negatives, model version/checksum; keep model repo creation deferred.\n\n### Acceptance Criteria\n- [ ] Model repo/artifact and reproducible runtime recorded\n- [ ] Real adapter contract with phone/person outputs and Gaze extension point\n- [ ] p50/p95 latency and accuracy evidence on named hardware or explicit BLOCKED status\n- [ ] No claims of real-model accuracy based on stub results\n\n### Security & Privacy\nUse approved synthetic/consenting adult samples only; no student footage used for training; record model limitations.\n\n### Tests & Evidence\nModel fixture tests + representative lighting/device dataset; synthetic and real-model results labeled separately.\n\n### DoD / Review Gate\nAI systems architect independent review; P4-C implementation blocked until real-model inputs available.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-0",
+        "priority:P0"
+      ],
+      "published_issue_number": 79,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/79",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-A1",
+      "title": "[P4-A1] Session Monitoring Policy, eligibility & immutable freeze",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-0.1"
+      ],
+      "body": "**Milestone:** P4-A | **Priority:** P0 | **Dependencies:** P4-0.1\n\n### Background / Scope\nBuild monitoring config defaults and invariants for class-restricted sessions only; validated flag combinations; immutable policy freeze.\n\n### Backend\nAdd additive config model/migration/API; validate class ownership+ACTIVE+≥1; prohibit PUBLIC and last-class removal; freeze at startsAt/OPEN/first Attempt using stable lock/version.\n\n### Frontend\nCreate/update session checkbox UI, camera-dependent options, policy/retention display and validation across canonical/legacy routes.\n\n### Media / AI / Ops\nNo LiveKit dependency for config read/write; feature flag default OFF.\n\n### Acceptance Criteria\n- [ ] PUBLIC monitoring is rejected server-side\n- [ ] Monitored Session requires ≥1 owned active assigned classroom even if client sends zero IDs\n- [ ] Monitoring ON implies camera required; invalid AI/clip/recording combos rejected\n- [ ] Settings freeze with correct race/optimistic concurrency, including lazy-open SCHEDULED\n\n### Security & Privacy\nOwner-only writes and no public disclosure of private policy; default OFF for old client requests.\n\n### Tests & Evidence\nMigration fresh/upgrade + service and HTTP validation, concurrent start/freeze/class-removal, FE form a11y/validation.\n\n### DoD / Review Gate\nIndependent BE+FE review; no change in public/non-monitored eligibility.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-a",
+        "priority:P0"
+      ],
+      "published_issue_number": 80,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/80",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-A2",
+      "title": "[P4-A2] Attempt/browser activity ingestion and client telemetry",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-A1"
+      ],
+      "body": "**Milestone:** P4-A | **Priority:** P1 | **Dependencies:** P4-A1\n\n### Background / Scope\nBounded event vocabulary for browser focus/tab, answer interaction, navigation, connectivity, and attempt lifecycle hints; durable ingestion.\n\n### Backend\nAdd attempt-scoped activity event table, batch API, idempotency, trust levels, rate/size limits, server receivedAt, safe validation and cleanup metadata.\n\n### Frontend\nAdd intent-based tracking without React rerender duplicates; bounded background retry queue and network-gap indicators; never capture essay per keystroke.\n\n### Media / AI / Ops\nNone; use existing Postgres/REST; do not add new broker.\n\n### Acceptance Criteria\n- [ ] Events survive reload and are Attempt-scoped\n- [ ] Duplicate batches cannot create infinite rows\n- [ ] Clearly distinguish BROWSER-observed and SERVER-confirmed\n- [ ] Tracking OFF stops browser collection but not authoritative core lifecycle\n\n### Security & Privacy\nOwnership-only API, no PII/answer key in free-form metadata, caps and abuse handling.\n\n### Tests & Evidence\nFE event tests, BE rate/size/owner/duplicate/out-of-order tests and browser offline scenario.\n\n### DoD / Review Gate\nIndependent tracking/privacy review of allowed event fields and data size.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-a",
+        "priority:P1"
+      ],
+      "published_issue_number": 81,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/81",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-A3",
+      "title": "[P4-A3] Atomic accepted-answer history with autosave correctness preserved",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-A1"
+      ],
+      "body": "**Milestone:** P4-A | **Priority:** P0 | **Dependencies:** P4-A1\n\n### Background / Scope\nAppend accepted-only answer versions without breaking current atomic UPSERT and deadline/concurrency semantics.\n\n### Backend\nAppend history after UPSERT affected=1 **in same transaction**; unique question+accepted seq; optional hash/metadata not unrestricted essay content; rollback on history failure.\n\n### Frontend\nNo new save flow; reuse `use-autosave.ts` and answer-store as-is unless necessary for client event hooks.\n\n### Media / AI / Ops\nNo media dependency.\n\n### Acceptance Criteria\n- [ ] Exactly one history row per accepted sequence\n- [ ] Stale or retried UPSERT produces zero new history rows\n- [ ] Failed history write rolls back answer update\n- [ ] Current answer and submit/grade behavior unchanged\n\n### Security & Privacy\nSeparate permission for history read; essay snapshot minimization and retention.\n\n### Tests & Evidence\nTestcontainers conflicting saves, accepted seq, stale, parallel submit/autosave, rollback and large essay privacy.\n\n### DoD / Review Gate\nDatabase/concurrency specialist independent review; P0 gate.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-a",
+        "priority:P0"
+      ],
+      "published_issue_number": 82,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/82",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-A4",
+      "title": "[P4-A4] Durable Attempt timeline read model and monitoring STOMP envelopes",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-A2",
+        "P4-A3"
+      ],
+      "body": "**Milestone:** P4-A | **Priority:** P1 | **Dependencies:** P4-A2, P4-A3\n\n### Background / Scope\nProvide timeline pagination/read and non-lossy reconnect semantics; introduce versioned monitoring event stream, preserving existing STOMP contracts.\n\n### Backend\nCursor API, indexes, normalized timeline query, `monitoring_outbox`; allowlist new monitoring subscribe path with existing DB-backed Session owner checks; no client SEND.\n\n### Frontend\nTimeline basic filters, loading/empty states, REST baseline, STOMP event dedupe/re-fetch.\n\n### Media / AI / Ops\nNo additional message broker until benchmark says otherwise.\n\n### Acceptance Criteria\n- [ ] Timeline reload preserves history\n- [ ] Out-of-order/client clock skew are labeled, stable pagination has no missing/duplicate pages\n- [ ] New STOMP destination denies other teacher/student subscriptions\n- [ ] Legacy six realtime events and current LiveMonitor continue functioning\n\n### Security & Privacy\nNo correct answers/grade payloads in STOMP; cursor/authorization safe from IDOR.\n\n### Tests & Evidence\nBE cursor boundary/idempotency tests, STOMP spoof/unauthorized integration and FE reconnect tests.\n\n### DoD / Review Gate\nRealtime/security independent review; original event contract compatibility proven.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-a",
+        "priority:P1"
+      ],
+      "published_issue_number": 83,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/83",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-B1",
+      "title": "[P4-B1] LiveKit self-hosted and Egress infrastructure design/compose spike",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-0.1",
+        "P4-A1"
+      ],
+      "body": "**Milestone:** P4-B | **Priority:** P0 | **Dependencies:** P4-0.1, P4-A1\n\n### Background / Scope\nSecure local/dev self-host LiveKit SFU and Egress service with correct UDP/TURN signaling and Redis integration; no production deployment.\n\n### Backend\nImplement MediaGateway wrapper and short-lived token service only after approved issue starts.\n\n### Frontend\nDev media connectivity diagnostic route/client for smoke tests.\n\n### Media / AI / Ops\nCompose profile, pinned versions, secret injection, TLS/network plan, RoomService health metrics, camera-only publish permissions; document remote-browser NAT limitations.\n\n### Acceptance Criteria\n- [ ] Student and teacher can join one room/Session under controlled permissions\n- [ ] Student cannot subscribe or publish audio/screen\n- [ ] Egress runs separately and can record a test camera track\n- [ ] Self-host token stale rejoin behavior verified and documented\n\n### Security & Privacy\nTLS, no exposed secrets, minimal grants, no media access after session ownership failure beyond documented TTL residual.\n\n### Tests & Evidence\nReal two-camera/single teacher test, network firewall/TURN, negative permission and restart tests.\n\n### DoD / Review Gate\nMedia/security infrastructure review; no prod deploy gate passed.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-b",
+        "priority:P0"
+      ],
+      "published_issue_number": 84,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/84",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-B2",
+      "title": "[P4-B2] Backend verified camera preflight and new Attempt readiness lease",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-B1",
+        "P4-A1"
+      ],
+      "body": "**Milestone:** P4-B | **Priority:** P0 | **Dependencies:** P4-B1, P4-A1\n\n### Background / Scope\nPreflight before Attempt ID exists; bind trusted media identity+epoch to a one-time readiness lease consumed inside existing start transaction.\n\n### Backend\nEligibility+policy notice endpoint, preflight/token/verify, track query, lease hash+expiry, authoritative start gate, post-start Attempt binding and orphan pre-start cleanup; resume keeps working under camera loss.\n\n### Frontend\nLanding flow requests permission, shows preview and uses lease in existing start mutation.\n\n### Media / AI / Ops\nRoom state/webhook validation + optional Egress start for recording ON before Attempt.\n\n### Acceptance Criteria\n- [ ] No actual published camera → new monitored Attempt blocked\n- [ ] Only same user/Session/current policy may consume lease once\n- [ ] Simultaneous start produces one Attempt and correct binding\n- [ ] Resume existing IN_PROGRESS Attempt never loses autosave access because camera down\n\n### Security & Privacy\nNo camera bypass, token never logged, no trust in frontend `ready` boolean.\n\n### Tests & Evidence\nHttp/Testcontainers race/expiry/replay/cross-user/session; real webcam preflight + Egress failure tests.\n\n### DoD / Review Gate\nAttempt concurrency + security specialist independent review.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-b",
+        "priority:P0"
+      ],
+      "published_issue_number": 85,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/85",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-B3",
+      "title": "[P4-B3] Student camera client + Teacher selective Camera Grid",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-B1",
+        "P4-B2"
+      ],
+      "body": "**Milestone:** P4-B | **Priority:** P1 | **Dependencies:** P4-B1, P4-B2\n\n### Background / Scope\nStudent permission/preflight/indicator UI; teacher grid and focused video view respecting existing Session detail design.\n\n### Backend\nProvide authorized teacher token endpoint and camera state query, participant↔attempt projection.\n\n### Frontend\nCamera preview, permission denial/unavailable, grid virtualization/low layers, focus high layer, accessibility, responsive status.\n\n### Media / AI / Ops\nLiveKit JS SDK publishing/subscription lifecycle with no mic/audio; drop off-screen subscriptions.\n\n### Acceptance Criteria\n- [ ] Teacher can inspect correct eligible students in room\n- [ ] Student cannot view another camera\n- [ ] 5–10 card grid selectively subscribes to low-quality streams; high-quality subscribe only for selected camera\n- [ ] No blocking of Attempt rendering by video errors\n\n### Security & Privacy\nTeacher owner/permission required at issuance; stream access audit.\n\n### Tests & Evidence\nPlaywright + browser media mocks + real browser tests, different roles, tabs and screenreader checks.\n\n### DoD / Review Gate\nIndependent UX/performance/security review.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-b",
+        "priority:P1"
+      ],
+      "published_issue_number": 86,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/86",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-B4",
+      "title": "[P4-B4] Camera state reconciliation, reconnect gaps and token revocation",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-B2",
+        "P4-B3"
+      ],
+      "body": "**Milestone:** P4-B | **Priority:** P0 | **Dependencies:** P4-B2, P4-B3\n\n### Background / Scope\nComplete camera/media lifecycle and incident recording, including missed LiveKit webhook and selfhost token revocation risk.\n\n### Backend\nSigned webhook ingestion + dedupe; periodic room reconciliation; connection incidents, short TTL grant renewal checks and RemoveParticipant on denial/submit.\n\n### Frontend\nReconnect bounded retry, partial/degraded status, no forced submission; teacher gap timeline.\n\n### Media / AI / Ops\nObservability for track publication, orphan room cleanup and Egress lifecycle hints.\n\n### Acceptance Criteria\n- [ ] After camera loss Attempt persists and saves answers\n- [ ] Connection intervals/gaps are durable\n- [ ] Revoked user loses Backend grants; residual self-host stale-token window measured\n- [ ] Reordered/missing webhooks reconcile with server state\n\n### Security & Privacy\nSigned webhook verification, replay defense, monitor ownership and stale-token threat acceptance.\n\n### Tests & Evidence\nMedia restart/packet loss/browser reload/removed teacher test + fail-injection.\n\n### DoD / Review Gate\nSecurity/reliability independent review; residual media revocation risk reported.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-b",
+        "priority:P0"
+      ],
+      "published_issue_number": 87,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/87",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-C1",
+      "title": "[P4-C1] Independent AI service skeleton, model-adapter SDK & transport",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-0.2",
+        "P4-B1"
+      ],
+      "body": "**Milestone:** P4-C | **Priority:** P0 | **Dependencies:** P4-0.2, P4-B1\n\n### Background / Scope\nCreate a separate AI codebase **only when specifically authorized**, modular receiver/adapters/scheduler/outbox and trusted Backend callback.\n\n### Backend\nAI internal callback endpoint with service authentication, model allowlist, binding validation and idempotency.\n\n### Frontend\nMonitoring AI coverage status and unavailable state.\n\n### Media / AI / Ops\nFuture AI repo/submodule, container, config, fake adapter, health/readiness and reproducible CI; do not grant DB grading permissions.\n\n### Acceptance Criteria\n- [ ] Fake video frames can traverse AI adapter and authenticated Backend event contract\n- [ ] No model-specific data leaks across adapter boundary\n- [ ] Replay/cross-Attempt forgery rejected\n- [ ] AI service restart/overload does not break Attempt\n\n### Security & Privacy\nWorker credentials isolated, no student footage logged or trained by default.\n\n### Tests & Evidence\nContract, container restart, forged callback, fake detector and bounded queue tests.\n\n### DoD / Review Gate\nArchitecture and security review; repo creation subject to explicit owner permission.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-c",
+        "priority:P0"
+      ],
+      "published_issue_number": 88,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/88",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-C2",
+      "title": "[P4-C2] Integrate real phone/multiple-person detectors and measure performance",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-C1",
+        "P4-0.2"
+      ],
+      "body": "**Milestone:** P4-C | **Priority:** P0 | **Dependencies:** P4-C1, P4-0.2\n\n### Background / Scope\nLoad verified real models; normalize labels/boxes; validate latency/accuracy under representative webcam conditions. Gaze adapter extension point, but detection disabled until independently verified.\n\n### Backend\nDocument accepted model version/type schema without relying on invented thresholds.\n\n### Frontend\nDisplay only supported detection classes and model coverage warnings.\n\n### Media / AI / Ops\nPreprocessing, warmup, GPU/CPU inference, batched or sampled pipeline, metrics, real-model eval scripts.\n\n### Acceptance Criteria\n- [ ] Real phone and multi-person output matches adapter contract\n- [ ] Model hash and runtime pinned\n- [ ] Measured accuracy and p95 latency on specified hardware\n- [ ] Gaze activation explicitly deferred until validated\n\n### Security & Privacy\nApproved evaluation footage, dataset provenance and bias/false-positive evaluation.\n\n### Tests & Evidence\nSeparate real-model test evidence, confusion metrics, per device/light scenario, load samples.\n\n### DoD / Review Gate\nAI/ML independent review; no mock-only signoff.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-c",
+        "priority:P0"
+      ],
+      "published_issue_number": 89,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/89",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-C3",
+      "title": "[P4-C3] Temporal detection aggregation, trusted alerts and realtime feed",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-C2",
+        "P4-A4",
+        "P4-B4"
+      ],
+      "body": "**Milestone:** P4-C | **Priority:** P1 | **Dependencies:** P4-C2, P4-A4, P4-B4\n\n### Background / Scope\nPersist raw detections separately from grouped alerts; capture event provenance and alert time windows.\n\n### Backend\nAI detection ingest dedupe, mapping at observed media epoch, aggregation/cooldown rules, alert outbox and POST-review independence.\n\n### Frontend\nTeacher new alert notification, filters, counts and neutral wording.\n\n### Media / AI / Ops\nAI worker durable retry/outbox and threshold profile version; no one alert per frame.\n\n### Acceptance Criteria\n- [ ] One continuous phone detection produces one grouped alert window\n- [ ] Late callbacks never bind to next Attempt\n- [ ] Alert changes survive STOMP drop/reconnect\n- [ ] No automatic cheating verdict, penalty or grade mutation\n\n### Security & Privacy\nAuthenticated callback, authorization for alert read, confidence not represented as proof.\n\n### Tests & Evidence\nBurst/duplicate/out-of-order/lateness tests, fake detector and verified real-model run.\n\n### DoD / Review Gate\nBackend+AI independence review and false-alert assessment.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-c",
+        "priority:P1"
+      ],
+      "published_issue_number": 90,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/90",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-D1",
+      "title": "[P4-D1] Private evidence Object Storage and AI snapshot pipeline",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-C3",
+        "P4-B1"
+      ],
+      "body": "**Milestone:** P4-D | **Priority:** P0 | **Dependencies:** P4-C3, P4-B1\n\n### Background / Scope\nPrivate MinIO dev and S3-compatible abstraction, images linked to vetted AI alerts with immutable metadata/checksum.\n\n### Backend\nEvidence asset metadata/upload state, backend authorization/signed URL grant, access audit and object recovery.\n\n### Frontend\nEvidence thumbnail/preview for teacher and expired/failed states.\n\n### Media / AI / Ops\nAI snapshot original-frame capture, checksum verification, private object upload and dedup/cooldown.\n\n### Acceptance Criteria\n- [ ] One alert resolves to appropriate snapshot when capture enabled\n- [ ] No large image in STOMP or PostgreSQL\n- [ ] Cross-user evidence access denied and audited\n- [ ] Upload failure does not falsely show AVAILABLE\n\n### Security & Privacy\nS3 IAM least privilege, private buckets, TLS/encryption, short signed grants.\n\n### Tests & Evidence\nMinIO integration HEAD/hash/unauthorized tests and repeat detection storage cap.\n\n### DoD / Review Gate\nStorage/security/privacy independent review.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-d",
+        "priority:P0"
+      ],
+      "published_issue_number": 91,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/91",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-D2",
+      "title": "[P4-D2] Opt-in per-Attempt Egress full recording and segment recovery",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-B2",
+        "P4-B4",
+        "P4-D1"
+      ],
+      "body": "**Milestone:** P4-D | **Priority:** P0 | **Dependencies:** P4-B2, P4-B4, P4-D1\n\n### Background / Scope\nFull recording remains OFF by default; ON runs authenticated per-camera Egress with real status and multiple segments/gaps.\n\n### Backend\nRecording coordinator state machine, preflight Egress started check, attempt binding, after-commit stop, S3 HEAD finalized verification and background reconciliation.\n\n### Frontend\nRecording indicator, teacher availability/partial/failure and playback entry.\n\n### Media / AI / Ops\nSelf-host Egress pinned version, camera-only media source, segment MP4/HLS and storage uploads.\n\n### Acceptance Criteria\n- [ ] No full video when OFF\n- [ ] ON captures correct student/Attempt including reconnect segments\n- [ ] AVAILABLE only after uploaded object verified\n- [ ] Egress crash/status loss produces truthful PARTIAL/FAILED, Attempt still usable\n\n### Security & Privacy\nNo audio, teacher-only access, prestart orphan capture cleanup and disclosure.\n\n### Tests & Evidence\nReal Egress/local MinIO/interrupt/upload fail/finalize/duplicate webhook tests.\n\n### DoD / Review Gate\nMedia/reliability + privacy independent review.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-d",
+        "priority:P0"
+      ],
+      "published_issue_number": 92,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/92",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-D3",
+      "title": "[P4-D3] Evidence video clips from full recording OR bounded rolling buffer",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-D2",
+        "P4-D1",
+        "P4-C3"
+      ],
+      "body": "**Milestone:** P4-D | **Priority:** P1 | **Dependencies:** P4-D2, P4-D1, P4-C3\n\n### Background / Scope\nClip extraction near alert from full recording and rolling temporary media when full recording OFF.\n\n### Backend\nClip request idempotency, source coverage/gap detection, async status and asset links.\n\n### Frontend\nClip player timeline deep links, PARTIAL/UNAVAILABLE messages.\n\n### Media / AI / Ops\nRolling encoded chunk worker or demonstrably equivalent Egress architecture, strict short TTL/unpinned deletion and measured resource use.\n\n### Acceptance Criteria\n- [ ] Recording ON produces alert clip with valid pre/post interval subject to coverage\n- [ ] Recording OFF + clip ON works using actual buffer rather than pretending past frames exist\n- [ ] Buffer chunks not pinned for alerts are promptly deleted\n- [ ] Missing source gaps lead to PARTIAL/UNAVAILABLE, never fictional clip\n\n### Security & Privacy\nDisclose that buffer itself stores video, encryption/private access, no indefinite pre-alert footage.\n\n### Tests & Evidence\n30s sample scenario, storage interruption, source expired, concurrent clipping and short-TTL cleanup.\n\n### DoD / Review Gate\nMedia/storage/privacy review; measure buffer disk/CPU cost at 5–10 publishers.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-d",
+        "priority:P1"
+      ],
+      "published_issue_number": 93,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/93",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-D4",
+      "title": "[P4-D4] Playback authorization, evidence retention & orphan cleanup",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-D2",
+        "P4-D3"
+      ],
+      "body": "**Milestone:** P4-D | **Priority:** P0 | **Dependencies:** P4-D2, P4-D3\n\n### Background / Scope\nSecure MP4/HLS Range/segment playback and automatic 30-day media/90-day activity retention.\n\n### Backend\nSegment-aware signed playback, audit grants, retention and manual-demo-cleanup metadata; hold as future extension, orphan recovery, deletion proof and EXPIRED tombstones.\n\n### Frontend\nRecording/evidence player and expired-state UX.\n\n### Media / AI / Ops\nS3 lifecycle and cleanup tasks; rolling buffer cleanup separate from 30-day policy.\n\n### Acceptance Criteria\n- [ ] No unauthenticated HLS segment, MP4 range seek works\n- [ ] Media deleted after configured retention per policy\n- [ ] Activity metadata remains queryable up to 90d with EXPIRED asset state\n- [ ] Orphan preflight and failed Egress objects reconciled\n\n### Security & Privacy\nCross-session playback IDOR, no public buckets, retention expiry, manual demo purge and secure sharing controls.\n\n### Tests & Evidence\nEnd-to-end playlist/segment/Range access, simulated expiry, storage outage and rerun cleanup idempotency.\n\n### DoD / Review Gate\nSecurity/privacy and ops independent review.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-d",
+        "priority:P0"
+      ],
+      "published_issue_number": 94,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/94",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-E1",
+      "title": "[P4-E1] Unified teacher monitoring overview & per-Attempt timeline UI",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-A4",
+        "P4-B3",
+        "P4-C3",
+        "P4-D4"
+      ],
+      "body": "**Milestone:** P4-E | **Priority:** P1 | **Dependencies:** P4-A4, P4-B3, P4-C3, P4-D4\n\n### Background / Scope\nUnify Session monitoring counts, camera grid, roster, alerts and Attempt timeline, preserving Participant Management and Results/Statistics.\n\n### Backend\nAggregated overview queries with correct camera vs Attempt online distinction; timeline/media/report projection tuning.\n\n### Frontend\nStudent Monitoring Detail: camera, connection gaps, activity, answer history subject to permission, evidence, segments and alerts; filters and virtualized lists.\n\n### Media / AI / Ops\nNo new runtime service.\n\n### Acceptance Criteria\n- [ ] Teacher sees correct unified timeline after reload\n- [ ] Counts distinguish IN_PROGRESS from camera connected\n- [ ] Alert/evidence timestamp jumps work across segments and show gaps\n- [ ] Original Results/Statistics still functional\n\n### Security & Privacy\nNo answer keys/grades leaked ahead of authorized result flow, per-teacher owner checks.\n\n### Tests & Evidence\nFE RTL? not required; keyboard, responsive, reconnect and BE pagination/query-count tests.\n\n### DoD / Review Gate\nFrontend UX/data privacy independent review; E2E acceptance.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-e",
+        "priority:P1"
+      ],
+      "published_issue_number": 95,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/95",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-E2",
+      "title": "[P4-E2] Alert review, false-positive feedback and Attempt monitoring reports",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-E1",
+        "P4-C3"
+      ],
+      "body": "**Milestone:** P4-E | **Priority:** P1 | **Dependencies:** P4-E1, P4-C3\n\n### Background / Scope\nTeacher reviews alerts with notes, status and full review history, then sees monitoring report for finished Attempt.\n\n### Backend\nAppend-only reviews and status versioning, permission scope, report counts raw detections vs grouped vs confirmed, audit and pagination.\n\n### Frontend\nFalse positive, viewed, follow-up, notes, post-exam report view and export feasibility assessment.\n\n### Media / AI / Ops\nNo new AI training loop without separate authorization.\n\n### Acceptance Criteria\n- [ ] One can mark false positive without deleting original detection/evidence\n- [ ] Review history and ownership are immutable/auditable\n- [ ] Report distinguishes raw detections, alerts and teacher-reviewed outcomes\n- [ ] No automatic cheating or grade change\n\n### Security & Privacy\nOwner-only review, notes sanitation/length limits, retention and no unauthorized answer disclosure.\n\n### Tests & Evidence\nReview 409 race, authorization, counts aggregation, print/export feasibility, visual and E2E tests.\n\n### DoD / Review Gate\nHuman-review policy and backend security independent review.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-e",
+        "priority:P1"
+      ],
+      "published_issue_number": 96,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/96",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-F1",
+      "title": "[P4-F1] Independent security review and demo hardening",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-E2",
+        "P4-D4",
+        "P4-B4"
+      ],
+      "body": "**Milestone:** P4-F | **Priority:** P0 | **Dependencies:** P4-E2, P4-D4, P4-B4\n\n### Background / Scope\nIndependent course-demo safety/security audit across identity, media, AI, recording, storage, frontend. Formal legal/privacy production review is deferred because no real students are involved.\n\n### Backend\nFix any P0/P1/P2 auth, IDOR, rate, retention, encryption, audit issues discovered; demonstrate regression coverage.\n\n### Frontend\nCamera/recording notice, simple manual demo-data purge, accessibility, error disclosure and mitigations.\n\n### Media / AI / Ops\nSelf-host token residual risk measured; TURN, Egress secrets/IAM, private S3 access and local incident handling reviewed.\n\n### Acceptance Criteria\n- [ ] Cross-user/cross-class/media access negative tests green\n- [ ] Retention deletion, storage/stream audit verified\n- [ ] Demo security reviewer signs basic safety/privacy checklist; consented adults or approved footage only\n- [ ] No remaining P0/P1/P2 functional/security blockers\n\n### Security & Privacy\nFollow privacy-by-design and consented adult/synthetic demo footage; no automatic punishment.\n\n### Tests & Evidence\nPen tests incl HLS segment auth and stale token, data deletion and audit review; rerun all regressions.\n\n### DoD / Review Gate\nIndependent security reviewer + Product Owner gate; no production legal sign-off needed.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-f",
+        "priority:P0"
+      ],
+      "published_issue_number": 97,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/97",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    },
+    {
+      "key": "P4-F2",
+      "title": "[P4-F2] 5–10 camera demo benchmark, failure injection, real AI E2E and runbook",
+      "repository": "hhtuann/Quizopia_System",
+      "depends_on_keys": [
+        "P4-F1",
+        "P4-C2"
+      ],
+      "body": "**Milestone:** P4-F | **Priority:** P0 | **Dependencies:** P4-F1, P4-C2\n\n### Background / Scope\nQuantify capacity, full failure recovery and browser media→AI→evidence→review path; produce demo-readiness report and runbooks.\n\n### Backend\nBackend outbox/reconnect/snapshot query, DB throughput, start/autosave/submit consistency under load.\n\n### Frontend\nCross-browser/teacher grid UX, preflight failure and full E2E recordings.\n\n### Media / AI / Ops\nLiveKit, Egress, GPU, rolling-buffer, object storage, network metrics, reproducible scripts and CI evidence.\n\n### Acceptance Criteria\n- [ ] Real E2E successfully demonstrates all Phase 4 must-have features\n- [ ] Exact PR HEAD backend/frontend/AI tests and CI green\n- [ ] 5 publisher run PASS; 10 target measured if available, document actual p95, bandwidth, storage and GPU/CPU usage. 30/50/100 runs optional stretch\n- [ ] Fault injection demonstrates no answer loss, truthful monitoring gaps and recording status\n- [ ] Local Compose setup, demo seed accounts, consented camera plan, repeatable demo and rollback/runbooks complete; final GO/NO-GO recommendation\n\n### Security & Privacy\nNo real students used. Adult volunteers consent to camera recording or use approved/synthetic test footage; maintain basic security and retention.\n\n### Tests & Evidence\nMeasured browser/live-media/AI/S3 E2E; intentional SFU/AI/Egress/MinIO failure injection; full Testcontainers suites.\n\n### DoD / Review Gate\nIndependent final technical review. Owner authorizes merge/deploy separately; issue completion is not deployment authorization.\n\nFeature branch, targeted + full tests, PR exact HEAD CI, independent review until P0/P1/P2 free, **no merge/deploy without Owner approval**.\n\n**Academic demo scope:** No real-student production rollout. Prioritize working 5-camera (10 target) local demo, real model where AI involved, correctness/security, camera consent notice and private evidence. 30/50/100 streams, enterprise HA and formal legal clearance are NOT blocking acceptance unless Product Owner changes scope. Preserve independent P0/P1/P2 blocker review and separate merge/deploy gate.\n",
+      "labels_suggested": [
+        "phase-4",
+        "p4-f",
+        "priority:P0"
+      ],
+      "published_issue_number": 98,
+      "published_issue_url": "https://github.com/hhtuann/Quizopia_System/issues/98",
+      "publication_note": "GitHub issue body is authoritative; this JSON preserves prepublication design snapshots and dependencies, NOT an exact GitHub body export."
+    }
+  ],
+  "do_not_reimport": true,
+  "published_at": "2026-11-14"
+}
