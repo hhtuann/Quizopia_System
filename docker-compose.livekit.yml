@@ -58,7 +58,7 @@ services:
       # webhook delivery to the backend running on the Docker host
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:7880"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:7880"]
       interval: 10s
       timeout: 5s
       retries: 12
