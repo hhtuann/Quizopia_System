@@ -1,0 +1,30 @@
+# LiveKit Egress (P4-D placeholder, issue #84 "Egress configured separately")
+#
+# NOT enabled by default: start with `--profile egress`. This file documents
+# the wiring P4-D will finalize (video-only recording to MinIO/S3). The
+# Egress service shares the SFU's Redis and API credentials.
+
+redis:
+  address: livekit-redis:6379
+
+api_key: devquizopia
+api_secret: ${LIVEKIT_API_SECRET}
+
+# ws_url points at the SFU inside the compose network.
+ws_url: ws://livekit:7880
+
+# S3/MinIO output for P4-D recording segments — private buckets only.
+# Buckets planned in docs/phase4/TECHNICAL_DESIGN.md §11:
+#   monitoring/snapshots, monitoring/clips, monitoring/recordings,
+#   monitoring/rolling-temp  (all private; created by P4-D's setup step).
+# MinIO dev instance lives in the System compose stack (quizopia_minio).
+# P4-D will fill real credentials via env; none are committed here.
+# s3:
+#   access_key: <from owner env at P4-D time>
+#   secret:    <from owner env at P4-D time>
+#   region:    us-east-1
+#   bucket:    quizopia-monitoring-recordings
+#   endpoint:  http://quizopia_minio:9000
+#   force_path_style: true
+
+log_level: info

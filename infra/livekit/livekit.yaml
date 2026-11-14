@@ -1,0 +1,50 @@
+# LiveKit self-hosted SFU — Quizopia P4-B1 (issue #84, ADR-008 D2/D3).
+#
+# Local/dev profile only. Rendering: values in ${...} are expanded from the
+# environment supplied by docker-compose.livekit.yml (env_file: .env.livekit,
+# which is gitignored). No secrets are committed.
+#
+# Ports (see infra/livekit/README.md):
+#   7880  HTTP + WebSocket signaling (browsers connect here)
+#   7881  WebRTC-over-TCP fallback
+#   3478/udp  embedded TURN (relay path for restrictive networks)
+#   50100-50200/udp  WebRTC UDP media range (narrow range is fine for <=10
+#                    publishers; widen for the P4-F scale experiments)
+
+port: 7880
+bind_addresses:
+  - ""
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50100
+  port_range_end: 50200
+  # Local demo only: media is served from the Docker host address candidates.
+  use_external_ip: false
+
+redis:
+  address: livekit-redis:6379
+
+# Key name must match LIVEKIT_API_KEY; secret is injected from the env.
+# (If your livekit-server build does not expand env vars in the config,
+# docker-compose.livekit.yaml falls back to --key/--secret CLI flags.)
+keys:
+  devquizopia: ${LIVEKIT_API_SECRET}
+
+# Signed webhook delivery to the Quizopia backend (P4-B4, issue #87).
+# Backend runs on the host during dev/E2E, hence host.docker.internal.
+webhook:
+  api_key: devquizopia
+  urls:
+    - http://host.docker.internal:8080/internal/media/v1/livekit/webhooks
+
+# TURN relay for ICE-restricted student networks. UDP TURN needs no TLS
+# certificate; TLS TURN (turns:) requires a real domain+cert and is a
+# documented deployment step, not a local-demo requirement.
+turn:
+  enabled: true
+  udp_port: 3478
+
+logging:
+  level: info
+  json: false
