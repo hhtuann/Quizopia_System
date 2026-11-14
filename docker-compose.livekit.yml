@@ -1,0 +1,93 @@
+# Quizopia P4-B1 media infrastructure (issue #84) — self-hosted LiveKit.
+#
+# This stack is SEPARATE from the owner's docker-compose.yml on purpose:
+# the System compose file carries local owner modifications and must stay
+# untouched. Start with:
+#
+#   docker compose --env-file .env.livekit -f docker-compose.livekit.yml up -d
+#
+# Egress (P4-D) is defined but disabled behind the "egress" profile:
+#
+#   docker compose --env-file .env.livekit -f docker-compose.livekit.yml \
+#     --profile egress up -d
+#
+# Secrets come from the gitignored .env.livekit (LIVEKIT_API_KEY /
+# LIVEKIT_API_SECRET). Never commit real secrets.
+
+name: quizopia-media
+
+services:
+  livekit-redis:
+    image: redis:7-alpine
+    container_name: quizopia_livekit_redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [livekit]
+
+  livekit:
+    image: livekit/livekit-server:v1.9
+    container_name: quizopia_livekit
+    restart: unless-stopped
+    # livekit-server does NOT expand ${...} in its YAML config; render the
+    # template with the process env at launch. The secret never enters the
+    # command line (it stays in env + the container-local /tmp file).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sed "s|\$${LIVEKIT_API_SECRET}|$$LIVEKIT_API_SECRET|" /etc/livekit/livekit.yaml > /tmp/livekit.yaml
+        exec /livekit-server --config /tmp/livekit.yaml
+    ports:
+      - "7880:7880" # HTTP/WSS signaling
+      - "7881:7881" # WebRTC over TCP
+      - "3478:3478/udp" # embedded TURN (UDP)
+    environment:
+      # livekit-server expands ${...} in the config from its own process env.
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+    volumes:
+      - ./infra/livekit/livekit.yaml:/etc/livekit/livekit.yaml:ro
+    depends_on:
+      livekit-redis:
+        condition: service_healthy
+    extra_hosts:
+      # webhook delivery to the backend running on the Docker host
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:7880"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [livekit]
+
+  # -------------------------------------------------------------------
+  # Egress infrastructure PREP (P4-B1 scope: configured, NOT enabled).
+  # LiveKit Egress records room tracks to S3-compatible storage and is
+  # activated by P4-D (full recording / clips). The service below is a
+  # placeholder wiring diagram: enable the "egress" profile to run it.
+  # -------------------------------------------------------------------
+  egress:
+    image: livekit/egress:v1.9
+    container_name: quizopia_livekit_egress
+    restart: unless-stopped
+    profiles: ["egress"]
+    environment:
+      # Egress reads the same API key/secret pair as the SFU.
+      LK_API_KEY: ${LIVEKIT_API_KEY}
+      LK_API_SECRET: ${LIVEKIT_API_SECRET}
+      # Redis for request orchestration (same instance the SFU uses).
+      E_CONFIG_FILE: /etc/livekit/egress.yaml
+    volumes:
+      - ./infra/livekit/egress.yaml:/etc/livekit/egress.yaml:ro
+    depends_on:
+      livekit-redis:
+        condition: service_healthy
+    networks: [livekit]
+
+networks:
+  livekit:
+    name: quizopia_livekit_net
