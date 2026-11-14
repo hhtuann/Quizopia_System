@@ -19,7 +19,12 @@ rtc:
   tcp_port: 7881
   port_range_start: 50100
   port_range_end: 50200
-  # Local demo only: media is served from the Docker host address candidates.
+  # Browsers run on the Docker HOST in this demo: advertise loopback so ICE
+  # never selects the container-internal address (172.18.x.x is unreachable
+  # from the host — real-camera publisher DTLS times out on it). Docker's
+  # published ports (50100-50200, 7881, 3478) forward loopback into the
+  # container. For LAN demo browsers, set this to the host's LAN IP instead.
+  node_ip: 127.0.0.1
   use_external_ip: false
 
 redis:
