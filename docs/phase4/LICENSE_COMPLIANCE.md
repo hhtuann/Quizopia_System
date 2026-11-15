@@ -1,6 +1,6 @@
 # P4-C License Compliance Review — Ultralytics YOLO26s (AGPL-3.0)
 
-Status: **reviewed 2026-11-15; blocking decision(s) for the Product Owner.**
+Status: **Product Owner decisions D1–D3 accepted 2026-11-15; implementation submitted in P4-C Draft PRs. Verify final CI before any merge.**
 Scope: `frontend/public/models/yolo26s.onnx` (19,215,911 bytes, SHA-256
 `a1364960967674c8e0301222be72db49b26d01e9ad9bb08ad91f5a19e1364`) — committed to
 the public `Quizopia_Frontend` repository (PR #27).
@@ -9,10 +9,10 @@ the public `Quizopia_Frontend` repository (PR #27).
 
 | Item | Finding | Confidence |
 |---|---|---|
-| Model identity | Ultralytics YOLO26s, trained by Ultralytics on COCO (`metadata.names` = COCO 80; producer `pytorch 2.12.0`, ultralytics 8.4.64, date 2026-06-11) | Certain (graph metadata) |
+| Model identity | Ultralytics YOLO26s, **fine-tuned by the Quizopia Product Owner from publicly released pretrained `yolo26s.pt`** (owner-confirmed); ONNX graph advertises COCO 80 names (`metadata.names`; producer `pytorch 2.12.0`, ultralytics 8.4.64, date 2026-06-11) | Certain (graph metadata) |
 | Ultralytics' licensing position | **Weights trained with their code are derivative works of AGPL-3.0 software; ONNX exports inherit it.** Stated publicly by Ultralytics maintainers (ultralytics/ultralytics issue #22458, #21936) and their license pages | Certain (their stated position) |
 | Runtime dependency | `onnxruntime-web` 1.31.1 — **MIT licensed** (no copyleft) | Certain |
-| Quizopia repos | **No LICENSE file in any of the three repositories**; `backend/pom.xml` has an empty `<license/>`; `frontend/package.json` has no license field | Certain |
+| Quizopia repos | **AGPL-3.0 full-text LICENSE added in all three P4-C PR branches** (not merged yet). Backend Maven license and Frontend package license fields updated. GitHub public repo visibility alone does not grant a license. | Certain |
 | Distribution facts | The `.onnx` file is (a) committed to a public repo, (b) served by the app to every student browser at `/models/yolo26s.onnx` | Certain |
 
 ## 2. What AGPL-3.0 requires here (per Ultralytics' interpretation)
@@ -39,8 +39,7 @@ the public `Quizopia_Frontend` repository (PR #27).
 
 - **Academic/non-commercial use is NOT an AGPL exemption.** Nothing in this
   project relies on that.
-- This review does not relicense the project, remove the model, or purchase
-  anything — those are owner decisions.
+- The Product Owner subsequently **authorized AGPL-3.0 licensing of all three repositories** and retaining the fine-tuned model. No Ultralytics Enterprise purchase. This review does not assert every associated training artifact has been publicly distributed.
 
 ## 4. Verified mitigations already in place (technical, done)
 
@@ -53,18 +52,23 @@ the public `Quizopia_Frontend` repository (PR #27).
   preprocessing/postprocessing (letterbox, CHW, [1,300,6] parse) was written
   from the graph audit, not copied from their repo.
 
-## 5. Product Owner Decisions required
+## 5. Product Owner Decisions — APPROVED (2026-11-15)
 
 | # | Decision | Options | Default if undecided |
 |---|---|---|---|
-| D1 | Accept AGPL-3.0 terms for the model artifact as shipped | (a) comply: add AGPL text + source offer, keep model public; (b) buy Ultralytics Enterprise; (c) move model out of the public repo to owner-controlled storage (AGPL still arguably applies to serving); (d) replace with a permissively-licensed detector (e.g. YOLOX, Apache-2.0) in a later phase | keep draft PR unmerged — **merge blocker** |
-| D2 | Repo licensing posture | add an explicit project LICENSE to all three repos (e.g. copyright-header + chosen license); today the repos declare NOTHING, which is itself a defect for a public repo | recommend: pick a license explicitly |
-| D3 | AGPL app-source disclosure stance | if D1=(a): decide whether Quizopia source is offered under AGPL (Ultralytics' reading) or the app claims aggregation (contested reading) — legal counsel call | document the chosen stance |
+| D1 | **APPROVED:** retain owner fine-tuned `yolo26s.onnx`, comply with AGPL-3.0, no Enterprise purchase | Root LICENSE/third-party notices/source offer | Verify resulting PR CI |
+| D2 | **APPROVED:** license all three Quizopia repositories AGPL-3.0 | Full-text LICENSE added to Backend, Frontend and System PR branches; Maven/npm metadata updated where relevant | Verify licenses exist on `main` only after merge |
+| D3 | **APPROVED:** make Quizopia's complete corresponding application source available under AGPL-3.0; do not rely on a contested mere-aggregation exemption | SOURCE-AVAILABILITY.md in each repo, visible frontend source link | Owner to inventory fine-tuning recipe/config and verify third-party/dataset distribution rights |
 
 ## 6. Conclusion
 
-Technical compliance hygiene is in place (attribution, notices, docs). The
-**unresolved items are legal decisions only the Product Owner can make**
-(D1–D3). Until D1 is decided, PR #27 (frontend, which ships the model) should
-stay **draft/unmerged**. Backend PR #26 and System PR #103 do not distribute
-the artifact and are not license-blocked.
+The Product Owner **has accepted AGPL-3.0 for the model and all three application repositories**. License and source-offer changes are now in the **Draft PR branches**, pending CI and merge approval. The user confirms **self fine-tuning from public Ultralytics `yolo26s.pt` pretrained weights**; the original model card's incomplete provenance is amended accordingly. Public training scripts/config/augmentation and data release rights **were not supplied here** and must be inventoried before claiming reproducible training or full corresponding-source completeness. Do not publish private datasets, credentials or student footage. No merge/deploy is authorized by this documentation change.
+
+
+## 7. Source and license artifact locations (P4-C branch)
+
+- [System LICENSE](../../LICENSE), [System source offer](../../SOURCE-AVAILABILITY.md)
+- [Backend LICENSE](https://github.com/hhtuann/Quizopia_Backend/blob/feature/p4-c-ai-proctoring/LICENSE), [Backend source offer](https://github.com/hhtuann/Quizopia_Backend/blob/feature/p4-c-ai-proctoring/SOURCE-AVAILABILITY.md)
+- [Frontend LICENSE](https://github.com/hhtuann/Quizopia_Frontend/blob/feature/p4-c-ai-proctoring/LICENSE), [Frontend source offer](https://github.com/hhtuann/Quizopia_Frontend/blob/feature/p4-c-ai-proctoring/SOURCE-AVAILABILITY.md) and [third-party notices](https://github.com/hhtuann/Quizopia_Frontend/blob/feature/p4-c-ai-proctoring/LICENSE-THIRD-PARTY.md)
+
+Track P4-F source inventory separately. Do not conflate copyright/license permissions with permissions to publish a private or third-party dataset.

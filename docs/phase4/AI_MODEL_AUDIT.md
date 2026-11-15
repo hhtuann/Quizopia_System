@@ -80,6 +80,8 @@ The milestone is a **working classroom demonstration**, not a validated commerci
 
 ## 7. REAL AUDIT RESULTS (2026-11-15) — owner artifact `yolo26s.onnx`
 
+**Owner provenance clarification (2026-11-15):** model was fine-tuned by the owner from publicly available Ultralytics pretrained `yolo26s.pt`; it was not trained from random weights. Exact fine-tuning scripts/config and legally shareable dataset metadata are not available in these repositories yet and must be inventoried rather than invented. Licensing decision: AGPL-3.0 for all Quizopia repos; details in `LICENSE_COMPLIANCE.md`.
+
 The owner supplied the artifact at `D:\Developer\quizopia-ai-assets\yolo26s.onnx`
 (19,215,911 bytes, SHA-256 `a1364960967674c8e0301222be72db49b26d01e9ad9bb08ad91f5a19e1364`).
 Copied verbatim to `frontend/public/models/yolo26s.onnx` (checksum verified identical);
