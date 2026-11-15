@@ -75,3 +75,97 @@ All events record original sample timestamp, server receipt, `modelId`, `modelVe
 ## Academic-demo model acceptance note (2026-11-14)
 
 The milestone is a **working classroom demonstration**, not a validated commercial proctoring product. Show two real detection categories supported by the provided model (phone and multiple people), and record real model version, hardware, measured inference latency and representative success/failure clips. Explicitly label false positives and model limitations. Support 5 simultaneous video feeds for the demo if the machine permits; target 10. Model stubs are acceptable for CI and fault injection only, **never** as evidence that the real model works. Future gaze adapter must remain disabled until actual output contract and accuracy are supplied.
+
+---
+
+## 7. REAL AUDIT RESULTS (2026-11-15) — owner artifact `yolo26s.onnx`
+
+**Owner provenance clarification (2026-11-15):** model was fine-tuned by the owner from publicly available Ultralytics pretrained `yolo26s.pt`; it was not trained from random weights. Exact fine-tuning scripts/config and legally shareable dataset metadata are not available in these repositories yet and must be inventoried rather than invented. Licensing decision: AGPL-3.0 for all Quizopia repos; details in `LICENSE_COMPLIANCE.md`.
+
+The owner supplied the artifact at `D:\Developer\quizopia-ai-assets\yolo26s.onnx`
+(19,215,911 bytes, SHA-256 `a1364960967674c8e0301222be72db49b26d01e9ad9bb08ad91f5a19e1364`).
+Copied verbatim to `frontend/public/models/yolo26s.onnx` (checksum verified identical);
+model card `frontend/public/models/MODELCARD.md`. No inference code was supplied —
+the I/O contract below was derived by loading the graph and running it.
+
+### 7.1 Graph facts (measured)
+
+| Item | Fact |
+|---|---|
+| Identity | Ultralytics **YOLO26s**, ultralytics 8.4.64, exported pytorch 2.12.0, ONNX opset 17 |
+| License | **AGPL-3.0** — academic-demo use documented; not a redistribution of weights beyond the owner's own repo |
+| Input | `images` `[1,3,640,640]` float32; Ultralytics preprocessing: RGB, /255, letterbox pad 114 |
+| Output | `output0` `[1,300,6]` float32; row = `[x1,y1,x2,y2,score,classId]` in 640-letterbox pixel coords; **end-to-end NMS embedded** — no NMS step required by consumers |
+| Classes | COCO 80. Used: `0 person`, `62 tv`, `63 laptop`, `67 cell phone` |
+| Gaze | **Not present** (no gaze/head-pose output) — gaze adapter stays disabled (contract stub only) |
+
+### 7.2 Runtime decision (ADR-008 Amendment 1)
+
+Browser-side ONNX Runtime Web on the student's own camera track is the initial
+real-model path (`CLIENT_MODEL` provenance, `*_OBSERVED` events); a
+worker path (`WORKER_VERIFIED`, `POST /internal/ai/v1/detections`, API-key) is
+contract-ready but not deployed (repo creation separately owner-gated). Full
+rationale + comparison table: `AI_PROCTORING_CONTRACT.md` §2 (this folder).
+
+### 7.3 Measured latency
+
+| Runtime | Hardware | p50 | p95 | Notes |
+|---|---|---|---|---|
+| Python onnxruntime 1.32 CPU | Demo workstation (Ryzen, CPUExecutionProvider) | 50.1 ms | 56.6 ms | 30-run sorted, random 640² input |
+| onnxruntime-web (browser) | Same workstation | TBD §7.4 | TBD §7.4 | WASM vs WebGPU measured by `frontend/e2e/ai-benchmark.mts` |
+
+### 7.4 Browser benchmark (MEASURED 2026-11-15, real model)
+
+`node e2e/ai-benchmark.mts --webcam` (real attempt page, real adapter,
+`window.__quizopiaAi.createRealDetector()`; evidence
+`frontend/e2e/evidence/ai-benchmark.json` + `ai-benchmark-attempt.png`):
+
+| Pass | Runtime | Frames | wall p50 | wall p95 | Sustained FPS | Detections ≥0.5 |
+|---|---|---|---|---|---|---|
+| Synthetic canvas 30s | **ORT_WEB_WEBGPU** | 98 | **309 ms** | 321.5 ms | **3.2** | 0 (drawn shapes — no false positives) |
+| REAL webcam 20s | **ORT_WEB_WEBGPU** | 70 | **288 ms** | 299.7 ms | **3.5** | 0 |
+
+Environment: Chromium 159 headed, Windows x64, 16 logical cores, WebGPU
+adapter available. Wall time = preprocess + inference + postprocess.
+The default 1.5 FPS analysis budget therefore has >2× headroom; the
+scheduler caps at 3 FPS. WASM-only numbers were not separately captured
+this run (WebGPU available and selected on the demo machine); the
+synthetic-camera CI runs exercise the WASM fallback path functionally.
+
+Incidental REAL end-to-end evidence (during e2e bring-up, before the fake
+was injected deterministically): the REAL model once analyzed the
+synthetic Chromium camera stream live and its `cell phone` detection
+(≥0.5) was ingested ACCEPTED and aggregated into a PHONE_DETECTED alert —
+real browser inference → ingest → aggregation → teacher REST, unplanned
+but genuine (run log `AI-HTTP 200 ... ACCEPTED`, bg_78 chain).
+
+### 7.4.1 Evidence scope honesty (pre-merge review)
+
+- The **0 false positives on 98 synthetic frames** is a smoke observation
+  on drawn shapes ONLY — it is NOT a real-world accuracy claim. No
+  false-positive/false-negative evaluation on representative footage has
+  been performed.
+- Deferred to P4-F #98 (needs physical hardware + approved footage):
+  low-light behavior, occlusion handling, multi-person in real footage,
+  false-positive/negative measurement, WASM-only latency benchmark,
+  5-physical-webcam concurrent demo.
+- Independent AI Worker: NOT deployed — browser-first per ADR-008
+  Amendment 1; the worker contract exists (`/internal/ai/v1/detections`)
+  but nothing emits `WORKER_VERIFIED` rows until the owner deploys a
+  key-holding worker.
+
+### 7.5 Capability honesty table
+
+| Detection | Real-model support | Status in P4-C |
+|---|---|---|
+| Phone (`cell phone`) | Yes (COCO 67) | Implemented, real model |
+| External screen (`tv`/`laptop`) | Yes (COCO 62/63) | Implemented, real model |
+| Multiple persons (count of `person`) | Yes (COCO 0) | Implemented, real model |
+| Person not visible (0 `person`) | Yes (COCO 0 absence) | Implemented, observation only |
+| Gaze / looking away | **No** | Disabled adapter stub, no warnings shown |
+| Automatic cheating verdict | Out of scope by ADR-008 | Never implemented |
+
+False-positive characterization on representative footage: recorded with the
+real-model demo evidence (phone present/absent, screen present/absent, low
+light, portrait webcam, multi-person) — see P4-C final report; stub runs are
+always labeled SIMULATED and never used as accuracy evidence.
