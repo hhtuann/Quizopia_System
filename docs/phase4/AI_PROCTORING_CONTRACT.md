@@ -38,13 +38,34 @@ Why (evaluated against the alternatives):
 | FPS/latency for 5–10 cams | Each student's machine runs 1.5–3 FPS on its own stream; WebGPU 10–30ms, WASM 100–300ms/frame | Server CPU: 5–10 × 1.5FPS × ~50ms ≈ 1 core busy; headless WebRTC decode is heavy (chromium dep or Egress→files) | Browser now; worker additive later |
 | Deploy cost | None (static 19MB asset, cached) | New service + registry + compose + health | None now |
 | Blockers | None | Creating an AI repo/submodule requires separate owner approval (issue #88 DoD) | None now |
-| Provenance trust | CLIENT_AI_OBSERVED (ADR-008 D8 explicitly allows browser observations as non-verified) | SERVER_VERIFIED | Both, distinguished by `provenance` column |
+| Provenance trust | CLIENT_MODEL (ADR-008 D8 explicitly allows browser observations as non-verified) | WORKER_VERIFIED | Both, distinguished by the `provenance` column |
 | Reuse of model | Direct (ort-web runs the same artifact) | Direct (ort-node/python) | Same artifact both paths |
 
 ADR-008 D8 already states "Browser-side events are observations, not verified
 misconduct" — the amendment records browser inference as the initial real-model
 runtime and keeps the worker contract ready. **CLIENT detections are never
-labeled SERVER_VERIFIED / never auto-conclude cheating.**
+labeled WORKER_VERIFIED / never auto-conclude cheating.**
+
+**WORKER_VERIFIED semantics (honesty): it means "submitted by a holder of
+the worker API key" — NOTHING more. No independent AI worker exists in
+P4-C (repo creation is owner-gated), so no detection in this milestone is
+independently camera-verified. WORKER_VERIFIED rows can only appear if the
+owner deploys a key-holding worker later. Consequence (security review
+P2-3): a key holder can attribute detections to ANY in-progress attempt
+that has an active camera binding (ownership + binding are enforced, but
+nothing binds the claim to media the worker actually consumed). When a
+real worker is specified, extend this contract with: per-worker keys
+(`X-Api-Key: <keyId>.<secret>`, constant-time secret compare, keyId
+audited), and per-item `mediaIdentity` cross-checked against the active
+binding (or server-side correlation of LiveKit worker subscriptions).**
+
+**V39 hardening (pre-merge review):** detections persist
+`client_sequence`; a partial UNIQUE (attempt_id, provenance,
+client_sequence) on non-quarantined rows makes replay-with-fresh-eventIds
+report DUPLICATE; alert `detection_count` saturates at 64 and a window
+older than 10 minutes closes; `POST /internal/ai/**` is guarded by a
+pre-parse filter (API key + 128 KiB body cap BEFORE Jackson) and a
+per-attempt worker admission cap (240 events/min/attempt).
 
 ## 3. Detection event contract (v1)
 

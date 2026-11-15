@@ -137,6 +137,21 @@ synthetic Chromium camera stream live and its `cell phone` detection
 real browser inference → ingest → aggregation → teacher REST, unplanned
 but genuine (run log `AI-HTTP 200 ... ACCEPTED`, bg_78 chain).
 
+### 7.4.1 Evidence scope honesty (pre-merge review)
+
+- The **0 false positives on 98 synthetic frames** is a smoke observation
+  on drawn shapes ONLY — it is NOT a real-world accuracy claim. No
+  false-positive/false-negative evaluation on representative footage has
+  been performed.
+- Deferred to P4-F #98 (needs physical hardware + approved footage):
+  low-light behavior, occlusion handling, multi-person in real footage,
+  false-positive/negative measurement, WASM-only latency benchmark,
+  5-physical-webcam concurrent demo.
+- Independent AI Worker: NOT deployed — browser-first per ADR-008
+  Amendment 1; the worker contract exists (`/internal/ai/v1/detections`)
+  but nothing emits `WORKER_VERIFIED` rows until the owner deploys a
+  key-holding worker.
+
 ### 7.5 Capability honesty table
 
 | Detection | Real-model support | Status in P4-C |
