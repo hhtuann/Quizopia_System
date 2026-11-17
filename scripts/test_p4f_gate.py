@@ -146,5 +146,22 @@ class P4FManifestTests(unittest.TestCase):
         self.assertTrue(any("physicalDevicesWitnessed" in p for p in review_manifest(case)))
 
 
+    def test_boolean_does_not_count_as_zero_failed_tests(self):
+        case = valid_manifest()
+        case["tests"]["frontend"]["failed"] = False
+        self.assertTrue(any("tests.frontend.failed" in p for p in review_manifest(case)))
+
+    def test_boolean_does_not_count_as_zero_open_issues(self):
+        case = valid_manifest()
+        case["review"]["p1"] = False
+        self.assertTrue(any("review.p1" in p for p in review_manifest(case)))
+
+    def test_boolean_schema_version_rejected(self):
+        case = valid_manifest()
+        case["schemaVersion"] = True
+        self.assertTrue(any("schemaVersion" in p for p in review_manifest(case)))
+
+
+
 if __name__ == "__main__":
     unittest.main()
