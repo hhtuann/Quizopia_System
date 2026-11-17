@@ -39,3 +39,16 @@ All tests should use isolated consenting accounts. Do not disable authentication
 Security GO requires no open P0/P1/P2, verified cross-user/stream/evidence negatives, replay/expiry outcomes, honest 30/90 retention and demo purge, no grading impact, no default audio or hidden recording. Missing private media proof or independent review is **NO-GO**, even if CI is green.
 
 The original independent LiveKit-subscribing Python worker [#88](https://github.com/hhtuann/Quizopia_System/issues/88) does not exist: the implemented deployment is browser-first CLIENT_MODEL observations plus authenticated Backend worker-compatible callback. Never describe worker-specific fault injection as executed; defer or change scope only by explicit owner decision. This review is for the academic demo, not production certification.
+
+
+## Local live HTTP authorization probe (additional P4-F1 executable)
+
+Run the optional scripts/p4f_idor_probe.py against an isolated actual Backend with a **real owning teacher JWT** and **different, unrelated teacher JWT**, both obtained through normal login. Do not write tokens into command-line arguments, Git, screenshots or issue comments; set environment variables securely in the local terminal (avoid shared shell history).
+
+Required: P4F_API_URL, P4F_OWNER_JWT, P4F_FOREIGN_JWT, P4F_SESSION_ID and P4F_ATTEMPT_ID. The session/attempt must belong to the owner, not the foreign account. From System root:
+
+~~~powershell
+python scripts/p4f_idor_probe.py
+~~~
+
+Seven actual HTTP GET routes are checked for **owner 200, unrelated teacher 403/404, anonymous 401/403**: monitoring overview, participants, alerts, evidence list, recordings, Attempt report and review history. A route returning 404 to everyone is rejected (no false IDOR PASS on missing endpoint). The probe refuses nonlocal unencrypted HTTP and never prints credentials/response bodies/presigned URLs. A green result checks only these seven HTTP authorization boundaries; it **does not** establish LiveKit token revocation, expired presigned URLs, private MinIO access, AI worker callbacks, webhook signatures or real-camera privacy — those require separate independent tests and traces.
