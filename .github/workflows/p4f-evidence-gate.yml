@@ -7,12 +7,14 @@ on:
   pull_request:
     paths:
       - scripts/p4f_gate.py
+      - scripts/p4f_idor_probe.py
       - scripts/test_p4f_gate.py
       - .github/workflows/p4f-evidence-gate.yml
   push:
     branches: [main]
     paths:
       - scripts/p4f_gate.py
+      - scripts/p4f_idor_probe.py
       - scripts/test_p4f_gate.py
       - .github/workflows/p4f-evidence-gate.yml
   workflow_dispatch:
