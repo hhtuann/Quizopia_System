@@ -238,7 +238,7 @@ browser models** next to it (facts measured, see `AI_MODEL_AUDIT.md` §8):
 - New aggregated `alertType` **`LOOKING_AWAY`** (1:1 from the observation),
   default 20s cooldown (§5), returned by the existing
   `GET /api/exam-sessions/{sessionId}/ai-alerts`.
-- Persistence: Flyway **V40** widens the two CHECK constraints
+- Persistence: Flyway **V43** widens the two CHECK constraints
   (`chk_ai_detections_event_type`, `chk_ai_alerts_type`). No new table or
   column; still no FK/write path to the grading domain.
 
