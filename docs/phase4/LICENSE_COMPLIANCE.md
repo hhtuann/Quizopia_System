@@ -73,16 +73,29 @@ The Product Owner **has accepted AGPL-3.0 for the model and all three applicatio
 
 Track P4-F source inventory separately. Do not conflate copyright/license permissions with permissions to publish a private or third-party dataset.
 
-## 8. Gaze models (branch `kido`, 2026-11-16) — open items, NOT yet reviewed
+## 8. Gaze models (`feature/p4-c-gaze-tracking`) — provenance verified 2026-11-17
 
-Two more model files are added to `frontend/public/models/` on branch `kido`
-(not pushed, not merged):
+Two more model files ship in `frontend/public/models/` with the gaze
+feature. Provenance was verified by **byte-identical SHA-256** against the
+public upstream release assets (not by file name):
 
-| File | What the artifact itself says | Open |
-|---|---|---|
-| `yolov11n-face.onnx` | ONNX metadata: Ultralytics 8.3.20, `license = AGPL-3.0`, trained on `widerface.yaml` | Same AGPL-3.0 posture as §1–§6 applies. Unknown: who trained/published this checkpoint; WIDER FACE dataset terms |
-| `mobileone_s0_gaze.onnx` | No metadata at all | **Upstream repository and license unknown from the file.** The owner demo says it was trained on Gaze360 — check that dataset's usage terms (research/non-commercial restrictions are common for gaze datasets) |
+| File (SHA-256) | Upstream (verified) | Code / weight license | Training data terms |
+|---|---|---|---|
+| `yolov11n-face.onnx` (`61d8cf12…10ee67b5`) | akanametov/yolo-face release `1.0.0`, asset `yolov11n-face.onnx` — downloaded copy hash-identical | Repo **GPL-3.0**; ONNX metadata: Ultralytics **AGPL-3.0** (YOLO11n, ultralytics 8.3.20). GPL-3.0 §13 allows combination with AGPL-3.0; Quizopia is AGPL-3.0 | WIDER FACE — non-commercial research (dataset card CC BY-NC-ND 4.0) |
+| `mobileone_s0_gaze.onnx` (`8b4fdc4e…a55f7d9f`) | yakhyo/gaze-estimation ("MobileGaze") release `weights`, asset `mobileone_s0_gaze.onnx` — GitHub-published digest identical; DOI 10.5281/zenodo.14257640 | **MIT**, (c) 2024 Yakhyokhuja Valikhujaev | Gaze360 (MIT CSAIL) — non-commercial research only (CC BY-NC-SA per the paper record) |
 
-Until the owner records the source and license of the gaze model, treat its
-redistribution in a public repository as **undecided**. Notices are drafted
-in `frontend/LICENSE-THIRD-PARTY.md` §3.
+**Disposition.**
+
+- *Redistribution in the public AGPL-3.0 repositories (academic, non-commercial):*
+  permitted by the code/weight licenses above, with the notices recorded in
+  `frontend/LICENSE-THIRD-PARTY.md` §3 and `frontend/public/models/MODELCARD.md`.
+- *Commercial use / production deployment:* **owner decision required.** Both
+  training datasets are non-commercial research datasets; whether dataset
+  terms bind trained weights is unsettled. Until the owner signs off (or the
+  weights are replaced by commercially-cleared ones), treat the gaze feature as
+  **experimental / academic demo only**.
+- *Kill switch:* building the frontend with `NEXT_PUBLIC_AI_GAZE=off` ships the
+  attempt page without gaze analysis; yolo26s object detection is unaffected,
+  and the two files can then be removed from a release artifact.
+- The gaze signal is an **observation for teacher review only** — never a
+  verdict, never a score input (ADR-008, CONTRACT §8).
