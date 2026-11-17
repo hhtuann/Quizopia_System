@@ -185,3 +185,47 @@ printable route.
 
 No automated verdicts/scores, no new STOMP topics, no cross-session dashboard, no
 virtualization (caps suffice), no physical-webcam claims (P4-F #98), no retention changes.
+
+## 7. Pre-merge hardening amendments (2026-11-17 gate)
+
+- **F01**: the review append runs in a REQUIRES_NEW transaction (orchestrator
+  method holds no outer tx); a lost unique race rolls back atomically and the
+  idempotency probe runs on the caller's clean connection. Real-concurrency
+  regression: `AlertReviewConcurrencyIntegrationTests`.
+- **F02**: camera connected/disconnected periods are clamped to
+  `[startedAt, submittedAt|now]`; degenerate (tied) ranges are dropped.
+- **F03**: ALL participant filters (status/cameraState/reviewStatus incl. the
+  per-state review aggregate and the REVIEWED wildcard) execute inside the
+  attemptId-DESC keyset SQL — filtered pagination is complete; one lateral
+  query per page (no per-row N+1).
+- **F04**: signals are separated — `camera.online` (transport) vs
+  `camera.publishing` (verified track) vs state; `ai.enabled/detections/
+  quarantined` distinct from alert rollups; `teacherSubscriptionState` is
+  honestly `NOT_AVAILABLE` (the backend cannot observe the teacher's LiveKit
+  subscription; the teacher UI uses its own room handle).
+- **F06**: `coverageRatio` = union of COMPLETE-segment intervals clamped to
+  the monitoring window ÷ window length; the gap list includes leading and
+  trailing window holes. Exact-value tests.
+- **F07**: overview/participants resolve each user's LATEST binding only
+  (`DISTINCT ON ... active_from DESC, id DESC`); historical REVOKED bindings
+  never override newer state.
+- **F08**: timeline gains server-side time-range filters (from/to inputs in
+  the UI, part of the query key so a range change restarts pagination).
+  Provenance = the existing source dimension (CLIENT/SERVER). Severity is
+  NOT recorded anywhere in the event schema — deliberately not invented.
+- **F09**: review mutations and evidence/recording/review STOMP pings (and
+  reconnect backfill) also invalidate `["attempts", id, "monitoring-report"]`;
+  an already-open report refreshes without loops (mutation/ping-driven only).
+- **Report hardening**: legacy sessions without a policy row read all-OFF
+  (never 500); evidence listing bounded to newest 100 rows, reviews to 200
+  (chronological display preserved); the AI limits note cites the client
+  hook's threshold policy as its source.
+- **F05**: report segments with a `playbackRef` render an on-demand Play
+  control minting the audited P4-D recording URL when clicked (no pre-mint,
+  no dead links for non-playable rows).
+- **Retention verification**: media 30d + access-log 90d are enforced by
+  `EvidenceRetentionJob`. Activity events and review metadata currently have
+  NO automated sweep — a pre-existing P4-A scope gap, NOT introduced or
+  widened by P4-E; enforcing deletion there is a product decision handed to
+  P4-F (deleting unified-timeline history has durability implications this
+  phase must not decide).
