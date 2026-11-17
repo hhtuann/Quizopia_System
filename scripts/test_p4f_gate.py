@@ -7,6 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from p4f_gate import review_manifest
+from p4f_idor_probe import assess as assess_idor
 
 
 def valid_manifest():
@@ -160,6 +161,24 @@ class P4FManifestTests(unittest.TestCase):
         case = valid_manifest()
         case["schemaVersion"] = True
         self.assertTrue(any("schemaVersion" in p for p in review_manifest(case)))
+
+
+
+
+class P4FIDORContractTests(unittest.TestCase):
+    def test_actual_owner_and_unrelated_teacher_denied(self):
+        self.assertTrue(assess_idor(200, 403, 401))
+        self.assertTrue(assess_idor(200, 404, 403))
+
+    def test_unknown_endpoint_not_false_positive(self):
+        self.assertFalse(assess_idor(404, 404, 404))
+
+    def test_foreign_user_with_access_fails(self):
+        self.assertFalse(assess_idor(200, 200, 401))
+
+    def test_anonymous_getting_access_fails(self):
+        self.assertFalse(assess_idor(200, 403, 200))
+
 
 
 
