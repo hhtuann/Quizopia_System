@@ -162,10 +162,75 @@ but genuine (run log `AI-HTTP 200 ... ACCEPTED`, bg_78 chain).
 | External screen (`tv`/`laptop`) | Yes (COCO 62/63) | Implemented, real model |
 | Multiple persons (count of `person`) | Yes (COCO 0) | Implemented, real model |
 | Person not visible (0 `person`) | Yes (COCO 0 absence) | Implemented, observation only |
-| Gaze / looking away | **No** | Disabled adapter stub, no warnings shown |
+| Gaze / looking away | **No** (yolo26s) | P4-C: disabled stub. Branch `kido`: dedicated face + gaze models, experimental — see §8 |
 | Automatic cheating verdict | Out of scope by ADR-008 | Never implemented |
 
 False-positive characterization on representative footage: recorded with the
 real-model demo evidence (phone present/absent, screen present/absent, low
 light, portrait webcam, multi-person) — see P4-C final report; stub runs are
 always labeled SIMULATED and never used as accuracy evidence.
+
+---
+
+## 8. GAZE MODELS AUDIT (2026-11-16, branch `kido`)
+
+Owner supplied a working browser demo at `D:\PTIT\2026-1\Lap-trinh-Web\Test`
+(YOLO11n-face → MobileGaze, plain JS). The two models below were copied
+verbatim to `frontend/public/models/`; the demo's decode + rule logic was
+ported to TypeScript (`frontend/lib/ai/gaze-core.ts`, `gaze-adapter.ts`).
+Contract: `AI_PROCTORING_CONTRACT.md` §9. Model card:
+`frontend/public/models/MODELCARD.md`.
+
+### 8.1 Graph facts (measured by loading each graph)
+
+| Item | `yolov11n-face.onnx` | `mobileone_s0_gaze.onnx` |
+|---|---|---|
+| Size / SHA-256 | 10,583,411 B / `61d8cf12…10ee67b5` | 4,974,521 B / `8b4fdc4e…55f7d9f` |
+| Producer | pytorch 2.4.1, opset 19, IR 10 | pytorch 2.8.0, opset 20, IR 9 |
+| Metadata | Ultralytics 8.3.20, `widerface.yaml`, names `{0: 'face'}`, license AGPL-3.0 | **none** |
+| Input | `images [1,3,640,640]` | `input [1,3,448,448]` |
+| Output | `output0 [1,5,8400]` (no NMS) | `yaw [1,90]`, `pitch [1,90]` |
+
+`resnet18_gaze.onnx` (45,066,134 B, same I/O) exists in the demo but is not
+shipped (size; ~5× slower on CPU).
+
+### 8.2 Measured latency
+
+| Runtime | Hardware | face p50 / p95 | gaze p50 / p95 |
+|---|---|---|---|
+| Python onnxruntime 1.32 CPU | this workstation (WSL2), 20 runs, random input | 81.2 / 88.9 ms | 16.6 / 17.5 ms (ResNet-18: 80.7 / 92.6 ms) |
+| onnxruntime-web 1.31.1 wasm (Node) | same, ONE photo, 2 runs | 187–283 ms | 55–69 ms |
+| onnxruntime-web in a browser (WASM / WebGPU) | — | **not measured** | **not measured** |
+
+Per analyzed frame the page now runs three models (yolo26s + face + gaze).
+The combined in-browser cost and its effect on the 1.5 FPS budget are
+unmeasured; the scheduler adapts on the summed time.
+
+### 8.3 Real-model smoke (one public-domain photo, `skimage.data.astronaut`)
+
+- Real ONNX files → onnxruntime-web (wasm) → the real TypeScript decode
+  functions: 1 face, box `[180.7, 58.1, 269.7, 176.5]`, score 0.899.
+  Independent Python reference: `[180.4, 58.4, 270.5, 177.5]`, 0.900 →
+  face decode + NMS + un-letterbox agree within ~1px.
+- 8–9 raw anchors ≥ 0.5 before NMS for that single face → NMS is required.
+- Gaze on that ~90px-wide face: yaw/pitch +10.0°/−6.8° (bilinear crop,
+  Python) vs +0.4°/+2.4° (nearest-neighbour crop, Node). **~10° of spread
+  from resampling alone on a small face** — the reason faces < 80px are
+  ignored and why a single reading is never reported (1s median, 3s sustain).
+- Mirrored photo: yaw sign flips (+10.0° → −4.6°), as expected.
+
+### 8.4 Not done (open)
+
+- No accuracy / false-positive / false-negative evaluation of `LOOKING_AWAY`
+  on representative footage; no fairness check (glasses, lighting, skin
+  tone, webcam placement, external monitors).
+- The 25°/20°/20°, 3s, 20%/60s thresholds are the demo's defaults, not
+  derived from data.
+- Left/right labelling on the unmirrored frame was transferred from the
+  demo's (mirrored) convention, not validated against ground truth.
+- No in-browser run of the integrated attempt page with a real webcam was
+  performed in this change (unit tests mock ONNX; e2e not run).
+- Provenance/license of `mobileone_s0_gaze.onnx` and the dataset terms are
+  unconfirmed (see `LICENSE_COMPLIANCE.md` §8).
+- §6 unblock gate items for gaze ("temporal aggregation profile defined from
+  data", "false-positive/negative evaluation") are therefore still unchecked.
