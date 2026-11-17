@@ -134,7 +134,7 @@ class P4FManifestTests(unittest.TestCase):
     def test_open_security_finding_rejected(self):
         case = valid_manifest()
         case["review"]["p1"] = 1
-        self.assertIn("review.p1 must be 0", review_manifest(case))
+        self.assertIn("review.p1 must be integer 0", review_manifest(case))
 
     def test_false_answer_integrity_rejected(self):
         case = valid_manifest()
