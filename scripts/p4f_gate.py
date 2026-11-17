@@ -69,7 +69,8 @@ def review_manifest(data: Any) -> list[str]:
 
     if not isinstance(data, dict):
         return ["root must be an object"]
-    check(data.get("schemaVersion") == 1, "schemaVersion must be 1")
+    check(type(data.get("schemaVersion")) is int and data["schemaVersion"] == 1,
+          "schemaVersion must be integer 1")
     check(data.get("scope") == "ACADEMIC_DEMO", "scope must be ACADEMIC_DEMO")
     check(populated(data.get("runId")), "runId is required")
 
@@ -171,14 +172,16 @@ def review_manifest(data: Any) -> list[str]:
         check(type(get(data, "tests", suite, "passed")) is int
               and get(data, "tests", suite, "passed") > 0,
               f"tests.{suite}.passed must be > 0")
-        check(get(data, "tests", suite, "failed") == 0,
-              f"tests.{suite}.failed must be 0")
+        failed = get(data, "tests", suite, "failed")
+        check(type(failed) is int and failed == 0,
+              f"tests.{suite}.failed must be integer 0")
     check(get(data, "review", "independentSecurity") is True,
           "review.independentSecurity must be true")
     check(get(data, "review", "independentFunctional") is True,
           "review.independentFunctional must be true")
     for severity in ("p0", "p1", "p2"):
-        check(get(data, "review", severity) == 0, f"review.{severity} must be 0")
+        count = get(data, "review", severity)
+        check(type(count) is int and count == 0, f"review.{severity} must be integer 0")
     check(populated(get(data, "review", "evidenceRef")), "review.evidenceRef is required")
     for field in ("physicalDevicesWitnessed", "noSyntheticCounted"):
         check(get(data, "attestation", field) is True,
