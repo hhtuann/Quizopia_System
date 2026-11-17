@@ -228,9 +228,23 @@ virtualization (caps suffice), no physical-webcam claims (P4-F #98), no retentio
 - **F05**: report segments with a `playbackRef` render an on-demand Play
   control minting the audited P4-D recording URL when clicked (no pre-mint,
   no dead links for non-playable rows).
-- **Retention verification**: media 30d + access-log 90d are enforced by
-  `EvidenceRetentionJob`. Activity events and review metadata currently have
-  NO automated sweep — a pre-existing P4-A scope gap, NOT introduced or
-  widened by P4-E; enforcing deletion there is a product decision handed to
-  P4-F (deleting unified-timeline history has durability implications this
-  phase must not decide).
+- **Retention (F10, enforced)**: media 30d + access-log 90d as before, AND
+  `EvidenceRetentionJob.sweepActivityMetadata()` now enforces the approved
+  90d activity-metadata window — unified-timeline `attempt_activity_events`
+  and the `monitoring_alert_reviews` ledger are swept past the per-session
+  `activity_retention_days` (default 90 for legacy sessions). NEVER touches
+  `attempt_answer_history`, grades/grade_items, attempts, sessions or
+  evidence rows. Boundary clock tests (89d kept / exactly-90d kept /
+  91d deleted), per-session override isolation, untouched-contract tests
+  and idempotent re-run tests cover it.
+- **F11**: the report exposes `evidenceTotal/evidenceTruncated` and
+  `reviewsTotal/reviewsTruncated`; the UI renders honest "Showing latest N
+  of M" notices and a Load-full-history control backed by the cursor-paged
+  `GET /api/attempts/{id}/monitoring/reviews` drilldown (feed read gate).
+- **F12**: camera periods come from a single finite-state reducer over the
+  ordered event stream — repeated CONNECTED/DISCONNECTED events are
+  idempotent, every period is closed (window end at latest), ranges are
+  exact and non-overlapping.
+- **F13**: recording gaps derive from the SAME clamped merged intervals as
+  the coverage numerator — segment timestamps outside the monitoring window
+  can never emit gaps beyond its bounds.
