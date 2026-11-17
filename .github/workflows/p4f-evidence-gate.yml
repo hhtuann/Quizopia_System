@@ -1,0 +1,37 @@
+name: P4-F Evidence Gate (manifest validator only)
+
+# This job verifies the honesty/completeness contract of the evidence index.
+# It cannot manufacture five physical webcams, prove private artifacts exist,
+# attest to consent or replace independent security/hardware review.
+on:
+  pull_request:
+    paths:
+      - scripts/p4f_gate.py
+      - scripts/test_p4f_gate.py
+      - .github/workflows/p4f-evidence-gate.yml
+  push:
+    branches: [main]
+    paths:
+      - scripts/p4f_gate.py
+      - scripts/test_p4f_gate.py
+      - .github/workflows/p4f-evidence-gate.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validator-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Reject invalid P4-F real-hardware evidence declarations
+        run: python3 -m unittest discover -s scripts -p 'test_p4f_gate.py' -v
+      - name: Explain hardware limit
+        run: |
+          echo "This CI tests manifest validation logic ONLY."
+          echo "P4-F #98 requires 5 distinct physical webcams simultaneously."
+          echo "NO physical-camera, AI-accuracy, consent, Egress, S3 or outage PASS is implied."
