@@ -72,3 +72,17 @@ The Product Owner **has accepted AGPL-3.0 for the model and all three applicatio
 - [Frontend LICENSE](https://github.com/hhtuann/Quizopia_Frontend/blob/feature/p4-c-ai-proctoring/LICENSE), [Frontend source offer](https://github.com/hhtuann/Quizopia_Frontend/blob/feature/p4-c-ai-proctoring/SOURCE-AVAILABILITY.md) and [third-party notices](https://github.com/hhtuann/Quizopia_Frontend/blob/feature/p4-c-ai-proctoring/LICENSE-THIRD-PARTY.md)
 
 Track P4-F source inventory separately. Do not conflate copyright/license permissions with permissions to publish a private or third-party dataset.
+
+## 8. Gaze models (branch `kido`, 2026-11-16) — open items, NOT yet reviewed
+
+Two more model files are added to `frontend/public/models/` on branch `kido`
+(not pushed, not merged):
+
+| File | What the artifact itself says | Open |
+|---|---|---|
+| `yolov11n-face.onnx` | ONNX metadata: Ultralytics 8.3.20, `license = AGPL-3.0`, trained on `widerface.yaml` | Same AGPL-3.0 posture as §1–§6 applies. Unknown: who trained/published this checkpoint; WIDER FACE dataset terms |
+| `mobileone_s0_gaze.onnx` | No metadata at all | **Upstream repository and license unknown from the file.** The owner demo says it was trained on Gaze360 — check that dataset's usage terms (research/non-commercial restrictions are common for gaze datasets) |
+
+Until the owner records the source and license of the gaze model, treat its
+redistribution in a public repository as **undecided**. Notices are drafted
+in `frontend/LICENSE-THIRD-PARTY.md` §3.

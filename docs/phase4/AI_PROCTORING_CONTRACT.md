@@ -207,3 +207,86 @@ plus real webcam headed run (P4-B realcam flow extended with AI on) — evidence
 - Real-model capability claims only from the real benchmark runs.
 - PERSON_NOT_OBSERVED is an observation of the model, not proof of absence.
 - No auto cheating verdict, no score impact, no teacher auto-action. Evidence media is P4-D.
+
+## 9. Gaze amendment (branch `kido`, 2026-11-16) — `LOOKING_AWAY`
+
+Supersedes the "gaze adapter stays a disabled contract" statements of §1, §6
+and §7 above. yolo26s still has no gaze output; gaze uses **two additional
+browser models** next to it (facts measured, see `AI_MODEL_AUDIT.md` §8):
+
+| Model | Input | Output |
+|---|---|---|
+| `yolov11n-face.onnx` (Ultralytics YOLO11n, 1 class `face`) | `images [1,3,640,640]` RGB /255 letterbox | `output0 [1,5,8400]` `(cx,cy,w,h,score)`, **no NMS** |
+| `mobileone_s0_gaze.onnx` (MobileOne-S0) | `input [1,3,448,448]` RGB ImageNet-norm face crop | `yaw [1,90]`, `pitch [1,90]` logits (4° bins, −180° offset) |
+
+### 9.1 Wire contract (additive — no new endpoint, no new field)
+
+- New `eventType` **`LOOKING_AWAY_OBSERVED`** on the existing
+  `POST /api/attempts/{attemptId}/ai-detections` (and the worker path).
+  Validation, idempotency, quarantine, rate limit, media-binding rules: §3,
+  unchanged.
+- `modelId` `mobilegaze-mobileone-s0`, `modelVersion` `gaze360-onnx`;
+  `runtime` / `processingMs` are those of the gaze pipeline (face + gaze).
+- `detections` = exactly one box: the test taker's (largest) face.
+  - `classId` **1000** (outside COCO 0..79, so it is never read as a
+    yolo26s class);
+  - `bbox` normalized face box; `confidence` = **face detector** score (the
+    gaze model outputs no confidence);
+  - `label` = `gaze:<direction>:<yaw>:<pitch>` — direction ∈
+    `left|right|up|down|frequent`, yaw/pitch = rounded deviation in degrees
+    from the baseline (e.g. `gaze:left:-38:3`; ≤ 24 chars, limit 32).
+- New aggregated `alertType` **`LOOKING_AWAY`** (1:1 from the observation),
+  default 20s cooldown (§5), returned by the existing
+  `GET /api/exam-sessions/{sessionId}/ai-alerts`.
+- Persistence: Flyway **V40** widens the two CHECK constraints
+  (`chk_ai_detections_event_type`, `chk_ai_alerts_type`). No new table or
+  column; still no FK/write path to the grading domain.
+
+### 9.2 Client decision rules (`frontend/lib/ai/gaze-core.ts`)
+
+- Gaze runs on the same analyzed frame as yolo26s, only for the largest
+  face, and only when that face is ≥ 80px wide in the source frame.
+- **Auto-calibration:** baseline = median of the valid readings in the first
+  3s (≥ 4 samples) after gaze starts, clamped to ±20°. Until then nothing is
+  evaluated. There is no manual calibration step yet.
+- Angles are median-smoothed over 1s; deviation thresholds from the
+  baseline: 25° horizontal, 20° down, 20° up (reference-demo defaults).
+- **Sustained:** away continuously ≥ 3s (gaps < 1s do not reset) → report on
+  every frame while it lasts; the wire is paced to one event per 10s per type.
+- **Repeated:** away ≥ 20% of a 60s sliding window → one `frequent` report
+  per window.
+- Directions are from the test taker's own perspective on the unmirrored
+  frame (positive yaw = their right).
+- Multiple / missing faces from the face detector are NOT separate events —
+  `MULTIPLE_PERSONS_OBSERVED` / `PERSON_NOT_OBSERVED` stay owned by yolo26s.
+
+### 9.3 Runtime behaviour
+
+- The gaze models load in the background AFTER object detection is running;
+  any gaze failure (fetch, session, 3 consecutive inference errors) sets the
+  gaze sub-status to `unavailable` and never affects object detection,
+  autosave or submit.
+- All onnxruntime-web calls of the page (three sessions) are serialized
+  through one queue; the scheduler's FPS budget counts yolo26s + gaze time.
+- Batch sends are now ≥ 11s apart (a full batch of 8 still goes immediately):
+  with five event types, per-type pacing alone could exceed the server's
+  6 batches/min.
+- Student UI: the pill appends a neutral `hướng nhìn: …` status (loading /
+  lấy mốc / đang chạy / không khả dụng). No observation is shown to the
+  student. Teacher UI: `LOOKING_AWAY` card with direction + deviation and the
+  note that gaze is a model estimate for reference only.
+- Kill switch: build with `NEXT_PUBLIC_AI_GAZE=off`.
+
+### 9.4 Honesty (extends §8)
+
+- `LOOKING_AWAY` is the most inconclusive observation: an estimated angle
+  relative to an auto-picked baseline. Human-review context only — never a
+  verdict, never score input, no teacher auto-action.
+- **No accuracy, fairness or calibration evaluation has been done**
+  (lighting, glasses, camera position, skin tone, device quality). The
+  earlier requirement that `LOOKING_AWAY` only be enabled after such an
+  evaluation (`TECHNICAL_DESIGN.md`, `AI_MODEL_AUDIT.md` §5) is NOT met; this
+  branch enables it as an experimental feature and that is an owner decision
+  to confirm before merge.
+- Unit tests use a mocked ONNX runtime and SIMULATED frames; the only
+  real-model evidence is the smoke run in `AI_MODEL_AUDIT.md` §8.
