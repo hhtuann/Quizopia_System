@@ -33,10 +33,10 @@ Gaze is an optional supplementary observation. The face and gaze model upstream 
 ## Decision record (leave unset until actual owner approval)
 
 - Owner choice #88: UNDECIDED (A browser-first rescope / B build worker)
-- Independent architect/security sign-off #78: NOT RECORDED
-- P4-F1 independent security evidence: NOT RECORDED
-- Five simultaneous PHYSICAL cameras #98: NOT RECORDED
-- Actual-model/full media/fault gate #98: NOT RECORDED
+- Independent architect/security sign-off #78: PARTIALLY RECORDED (2026-11-18) — independent security review of Backend main `36880db` found **no P0/P1/P2**; 4 P3 hygiene findings (purge gate indirection, unbounded policy cache, worker-ingest admission order, report join robustness) fixed on branch `feature/p4-f-security-hardening` with targeted Testcontainers regression. Live IDOR probe (7 standard routes + 12 extended negatives incl. media-token renewal, snapshot upload, review write, unsigned webhook, keyless worker ingest) all PASS on the real running stack. Architecture docs (ADR-008 + Amendments, AI_PROCTORING_CONTRACT hybrid decision, API_EVENT_CONTRACTS) reconcile with source at Backend `36880db` / Frontend `9d0da1d`; the only stale text is the historical "V32 latest" baseline note in TECHNICAL_DESIGN.md §2 (written pre-implementation; migrations are now at V43, forward-only, never rewritten). Final #78 closure still requires owner sign-off.
+- P4-F1 independent security evidence: RECORDED (2026-11-18) — see above; evidence in private run archive `idor-live-evidence.md`.
+- Five simultaneous PHYSICAL cameras #98: NOT RECORDED — harness complete and hardened (6 review findings fixed: preflight race, calibration camera-theft, failure-context persistence, frame-delta retry, AI isolation, mic-guard classification), but the available workstation has ONE physical camera (BisonCam NB Pro). **Hardware blocker: needs 4 more distinct physical cameras or 5 separate laptops.**
+- Actual-model/full media/fault gate #98: IN PROGRESS — synthetic WebRTC E2E + real-model benchmark + fault injection executing on the isolated stack; results recorded in the final report.
 - Epic #77 final GO: NOT GRANTED
 
 This document proposes the cleanest path to legitimate P4 completion, not a false assertion that unbuilt scope or unperformed hardware work passed.
