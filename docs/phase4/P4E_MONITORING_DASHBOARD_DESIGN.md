@@ -190,8 +190,13 @@ virtualization (caps suffice), no physical-webcam claims (P4-F #98), no retentio
 
 - **F01**: the review append runs in a REQUIRES_NEW transaction (orchestrator
   method holds no outer tx); a lost unique race rolls back atomically and the
-  idempotency probe runs on the caller's clean connection. Real-concurrency
-  regression: `AlertReviewConcurrencyIntegrationTests`.
+  idempotency probe runs on the caller's clean connection. The
+  `expectedVersion` check is REPEATED on the transaction's own read — the
+  entry check alone is stale-prone (the CI five-way race caught a second
+  append computing a later version from a fresh read; a stale caller must
+  CONFLICT, never silently append). Real-concurrency regression:
+  `AlertReviewConcurrencyIntegrationTests` (2-thread races, same/different
+  keys, 5-way race + retry drain).
 - **F02**: camera connected/disconnected periods are clamped to
   `[startedAt, submittedAt|now]`; degenerate (tied) ranges are dropped.
 - **F03**: ALL participant filters (status/cameraState/reviewStatus incl. the
