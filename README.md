@@ -128,8 +128,21 @@ openssl rand -base64 48   # → QUIZOPIA_JWT_SECRET_BASE64  (≥ 32 bytes)
 openssl rand -base64 32   # → QUIZOPIA_DATA_ENCRYPTION_KEY_BASE64  (đúng 32 bytes)
 ```
 
-Đặt `QUIZOPIA_TEACHER_INVITE_CODE` (mã mời để đăng ký tài khoản Teacher).
-Muốn dùng tài khoản demo thì đặt `QUIZOPIA_DEMO_DATA_ENABLED=true`.
+Teacher invite code was removed in Identity-M1; teachers gain the Teacher capability after registration/sign-in (no `QUIZOPIA_TEACHER_INVITE_CODE` needed).
+For development demo accounts, set `QUIZOPIA_DEMO_DATA_ENABLED=true`.
+
+**Environment layout:** `Quizopia_System/.env` is the ONLY .env automatically loaded by the main Docker Compose stack. `backend/.env.example` documents settings for direct Spring Boot runs; Spring Boot does not automatically load an arbitrary backend/.env. `frontend/.env.local` is read by Next.js during local development; Docker Compose passes browser-facing `NEXT_PUBLIC_API_URL` at image build time.
+
+**Phase 5 (AI Authoring, implementation pending):** Once the backend AI feature is implemented, add `OPENAI_API_KEY` to the **System root** `.env` and optionally set `OPENAI_MODEL=gpt-5.4-mini` / `OPENAI_BASE_URL=https://api.openai.com/v1`. Never set OpenAI secrets in Next.js `NEXT_PUBLIC_*` values. The key alone does not create AI endpoints.
+
+**Apply `.env` changes to Docker backend (PowerShell or Bash):**
+```sh
+docker compose config --quiet
+docker compose up -d --no-deps --force-recreate backend
+```
+For changes to backend Java code/image, use `docker compose up -d --build backend`. If only a local Next.js `.env.local` changed, restart its dev server. For Docker frontend `NEXT_PUBLIC_API_URL` changes, rebuild frontend (`docker compose up -d --build frontend`).
+
+**Mailpit inside Compose:** set `QUIZOPIA_SMTP_HOST=mailpit` (not `localhost`); backend running directly on the host should use `localhost`.
 
 **3. Khởi chạy:**
 
@@ -166,7 +179,7 @@ Cùng với một lớp demo (gồm các học sinh trên làm thành viên).
 **Đăng ký thủ công** (khi không dùng demo data):
 
 - **Student**: tự đăng ký tại `/register`, sau đó academic admin duyệt qua trang *Pending Students* và gán vào trường.
-- **Teacher**: đăng ký với invite code (`QUIZOPIA_TEACHER_INVITE_CODE`).
+- **Teacher**: đăng ký tài khoản, sau đó kích hoạt quyền Teacher trong ứng dụng; không dùng invite code.
 - **System Admin / Academic Admin**: chỉ tạo qua dữ liệu demo.
 
 ---
