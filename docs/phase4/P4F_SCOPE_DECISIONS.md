@@ -15,7 +15,7 @@
 
 The university **academic-demo** acceptance may rely on real shipped local browser YOLO26s inference with CLIENT_MODEL provenance and teacher-reviewed observations, provided it is never called a server-verified, independent AI Worker. The Backend worker-compatible API remains as a secure future integration point. Defer the Python LiveKit subscriber, queue, worker scheduling, work distribution, GPU worker deployment and a separate AI repository/submodule to a future explicitly authorized workstream; do not create it merely to close a checklist.
 
-If the Product Owner chooses this rescope, update Epic #77's architecture/acceptance wording and cross-link the new deferred issue before closing #88. Existing P4 F1/F2 tests then inject browser AI-model failure/unavailability, rather than falsely claiming a worker outage run. This decision **does not weaken** the mandatory phone/multiple-person real-model demo or five physical webcams.
+If the Product Owner chooses this rescope, update Epic #77's architecture/acceptance wording and cross-link the new deferred issue before closing #88. Existing P4 F1/F2 tests then inject browser AI-model failure/unavailability, rather than falsely claiming a worker outage run. This decision **does not weaken** the mandatory phone/multiple-person real-model demo. ~~Five physical webcams~~ **Superseded by the 2026-11-18 owner amendment: TWO physical-source cameras (BisonCam + iPhone/iVCam) plus a separately-labeled five-simulated-publisher benchmark.**
 
 ## Proposed decision P4-F-D2 — Gaze is experimental and not a misconduct verdict
 

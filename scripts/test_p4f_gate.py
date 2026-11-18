@@ -39,8 +39,13 @@ def valid_manifest():
                 "teacherSubscribed": True, "decodedFrames": 120,
                 "measuredFps": 12.5, "evidenceRef": f"private/camera-{i}.json",
             }
-            for i in range(5)
+            # Owner amendment 2026-11-18: TWO physical-source cameras.
+            for i in range(2)
         ],
+        "syntheticBenchmark": {
+            "publishers": 5, "source": "SIMULATED", "teacherDecodedAll": True,
+            "evidenceRef": "private/synthetic-benchmark.txt",
+        },
         "teacherGrid": {"observedAt": grid, "evidenceRef": "private/grid.png"},
         "ai": {"phone": copy.deepcopy(record), "multiplePeople": copy.deepcopy(record)},
         "recording": {
@@ -96,10 +101,20 @@ class P4FManifestTests(unittest.TestCase):
         case["cameras"][0]["source"] = "SIMULATED"
         self.assertTrue(any("PHYSICAL" in p for p in review_manifest(case)))
 
-    def test_four_cameras_not_enough(self):
+    def test_one_camera_not_enough(self):
         case = valid_manifest()
         case["cameras"].pop()
-        self.assertIn("at least five physical camera records required", review_manifest(case))
+        self.assertTrue(any("at least two physical-source camera records required" in p for p in review_manifest(case)))
+
+    def test_synthetic_benchmark_mislabeled_physical_rejected(self):
+        case = valid_manifest()
+        case["syntheticBenchmark"]["source"] = "PHYSICAL"
+        self.assertTrue(any("SIMULATED" in p for p in review_manifest(case)))
+
+    def test_synthetic_benchmark_missing_rejected(self):
+        case = valid_manifest()
+        del case["syntheticBenchmark"]
+        self.assertTrue(any("syntheticBenchmark" in p for p in review_manifest(case)))
 
     def test_distinct_tracks_do_not_prove_distinct_devices(self):
         case = valid_manifest()

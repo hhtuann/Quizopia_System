@@ -17,7 +17,8 @@ python -m unittest discover -s scripts -p 'test_p4f_gate.py' -v
 - refs: exact 40-character full commit SHAs for system, backend and frontend. These must match the System merged gitlinks and exact-head test evidence.
 - environment: nonempty os, browser, livekitVersion, egressVersion, storage.
 - consent: true booleans adultsOnly, noticeShown, noDefaultAudio, noAutomaticVerdicts, footageRightsConfirmed. Only mark true when witnessed.
-- cameras: array of **at least five**, each must have the fields shown below, with distinct publisherId, deviceIdSha256 and trackSid.
+- cameras: array of **at least two** physical-SOURCE records (owner amendment 2026-11-18: e.g. built-in BisonCam + live iPhone via e2eSoft iVCam — virtual driver, physical phone sensor), each with distinct publisherId, deviceIdSha256 and trackSid.
+- syntheticBenchmark: object with publishers=5, source=SIMULATED, teacherDecodedAll=true, evidenceRef — the separately-labeled five-simulated-publisher WebRTC benchmark; NEVER counted toward cameras.
 - teacherGrid: observedAt timestamp with explicit timezone; private evidenceRef of a redacted screenshot and teacher subscriptions. Every physical camera must be ACTIVE at this exact timestamp.
 - ai: separate phone and multiplePeople proof objects, each with real-model identifiers and actual evidence, not fake hooks.
 - recording: on (real full video-only segment and seekable playback); off (no full recording, actual rolling-buffer clip).
@@ -28,7 +29,7 @@ python -m unittest discover -s scripts -p 'test_p4f_gate.py' -v
 - review: independentSecurity, independentFunctional true, outstanding p0=p1=p2=0 and evidenceRef.
 - attestation: adult witness identifier (private), physicalDevicesWitnessed, noSyntheticCounted true, and private witness evidenceRef.
 
-## One physical-camera record (repeat at least five times)
+## One physical-source camera record (repeat at least twice)
 
 ~~~json
 {
@@ -45,7 +46,7 @@ python -m unittest discover -s scripts -p 'test_p4f_gate.py' -v
 }
 ~~~
 
-**EXAMPLE NOT MEASURED**: The timestamp, FPS, hashes, IDs and values above are placeholders. The real reviewer must compare device identities OFFLINE and watch the teacher grid. Distinct WebRTC track SIDs alone do not prove distinct physical camera sensors. Five Chromium fake cameras or five browsers sharing one webcam do NOT qualify.
+**EXAMPLE NOT MEASURED**: The timestamp, FPS, hashes, IDs and values above are placeholders. The real reviewer must compare device identities OFFLINE and watch the teacher grid. Distinct WebRTC track SIDs alone do not prove distinct physical camera sensors. Five Chromium fake cameras, five browsers sharing one webcam, OBS/loopback sources or a duplicate of the same sensor do NOT qualify. The iVCam source qualifies ONLY as the live iPhone sensor (witness the phone streaming).
 
 ## AI / recording structure (not actual results)
 

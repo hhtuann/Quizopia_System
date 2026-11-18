@@ -85,9 +85,14 @@ def review_manifest(data: Any) -> list[str]:
                   "noAutomaticVerdicts", "footageRightsConfirmed"):
         check(get(data, "consent", field) is True, f"consent.{field} must be true")
 
+    # Product Owner amendment 2026-11-18 (#77/#98): the physical gate is TWO
+    # simultaneous independent real camera SOURCES (e.g. built-in BisonCam +
+    # live iPhone via e2eSoft iVCam — a virtual driver whose source is a
+    # physical phone sensor). Five SIMULATED publishers are a SEPARATE
+    # benchmark section and never count as physical sources.
     cameras = data.get("cameras")
-    check(isinstance(cameras, list) and len(cameras) >= 5,
-          "at least five physical camera records required")
+    check(isinstance(cameras, list) and len(cameras) >= 2,
+          "at least two physical-source camera records required (owner amendment 2026-11-18)")
     if isinstance(cameras, list):
         names, devices, tracks = set(), set(), set()
         grid_time = iso(get(data, "teacherGrid", "observedAt"))
@@ -120,6 +125,21 @@ def review_manifest(data: Any) -> list[str]:
             if start and end and grid_time:
                 check(start <= grid_time <= end,
                       f"{key} was not simultaneously active at teacherGrid.observedAt")
+
+    # Separate five-SIMULATED-publisher benchmark (amendment 2026-11-18):
+    # real LiveKit/WebRTC transport, synthetic device sources — explicitly
+    # labeled, never counted toward the physical-source gate above.
+    synthetic = data.get("syntheticBenchmark")
+    check(isinstance(synthetic, dict), "syntheticBenchmark section required")
+    if isinstance(synthetic, dict):
+        check(synthetic.get("publishers") == 5,
+              "syntheticBenchmark.publishers must be exactly 5 (labeled SIMULATED)")
+        check(synthetic.get("source") == "SIMULATED",
+              "syntheticBenchmark.source must be SIMULATED (never PHYSICAL)")
+        check(synthetic.get("teacherDecodedAll") is True,
+              "syntheticBenchmark.teacherDecodedAll must be true")
+        check(populated(synthetic.get("evidenceRef")),
+              "syntheticBenchmark.evidenceRef is required")
 
     for event in ("phone", "multiplePeople"):
         prefix = f"ai.{event}"

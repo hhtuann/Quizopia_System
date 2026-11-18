@@ -1,6 +1,6 @@
 # Quizopia P4-F — Final Academic Demo Runbook
 
-**Status: PROCEDURE, NOT EXECUTED EVIDENCE.** Scope: [Epic #77](https://github.com/hhtuann/Quizopia_System/issues/77), [P4-F1 #97](https://github.com/hhtuann/Quizopia_System/issues/97), [P4-F2 #98](https://github.com/hhtuann/Quizopia_System/issues/98). The gate explicitly requires **five distinct physical webcams simultaneously**, ten optional. Five fake Chromium cameras over real WebRTC are NOT five physical devices.
+**Status: PROCEDURE, NOT EXECUTED EVIDENCE.** Scope: [Epic #77](https://github.com/hhtuann/Quizopia_System/issues/77), [P4-F1 #97](https://github.com/hhtuann/Quizopia_System/issues/97), [P4-F2 #98](https://github.com/hhtuann/Quizopia_System/issues/98). **Product Owner amendment 2026-11-18:** the physical gate is **TWO simultaneous independent real camera SOURCES** — the built-in BisonCam NB Pro plus a live iPhone camera delivered via e2eSoft iVCam (a Windows virtual driver whose source is a physical phone sensor; the driver being virtual does NOT disqualify it). OBS/loopback/synthetic Chromium devices never qualify. Separately, five SIMULATED publishers over real LiveKit/WebRTC form a labeled benchmark section and are never counted as physical sources.
 
 Academic demo only: consenting adults or approved synthetic media (synthetic does not satisfy the five-device gate). No real-student rollout, hidden recording, microphone by default, public media, auto-cheating verdict or grade impact. Recording OFF by default; media/evidence retention 30 days and activity/review metadata 90 days.
 
@@ -8,7 +8,7 @@ Academic demo only: consenting adults or approved synthetic media (synthetic doe
 
 From the System repo root record full commit SHAs using git rev-parse HEAD and git ls-tree HEAD backend frontend, plus Backend and Frontend git rev-parse HEAD. Keep local Docker volumes and owner changes. Use fresh test accounts, consented adult participants, private evidence directory **outside Git**; never commit access tokens, device labels/IDs, recordings, presigned URLs, photos or participant identities.
 
-Prerequisites: Docker Desktop, Java 21, Maven wrapper, Node/npm, Chromium, Playwright, ffmpeg/ffprobe, MinIO, LiveKit + Egress. Have **five real distinct devices** (five laptops with one physical camera each is safer than five windows from one webcam). Capture environment hardware, OS, network topology and version pins in private manifest.
+Prerequisites: Docker Desktop, Java 21, Maven wrapper, Node/npm, Chromium, Playwright, ffmpeg/ffprobe, MinIO, LiveKit + Egress. Have **two real sources**: the workstation's built-in camera plus an iPhone running the e2eSoft iVCam app (witness the phone actually streaming). Capture environment hardware, OS, network topology and version pins in private manifest.
 
 ## 2. Start real local services
 
@@ -41,13 +41,13 @@ node e2e/gaze-benchmark.mts --webcam
 
 The Playwright config uses Chromium fake-device flags, and cannot satisfy #98 hardware. The gaze benchmark runs real ONNX inference but is NOT by itself a full teacher-grid/attempt demo or multi-device benchmark. Distinguish fake detector test hooks, simulated camera video, and actual inference.
 
-## 3. Five physical cameras: mandatory witnessed gate
+## 3. Two physical-source cameras: mandatory witnessed gate (amendment 2026-11-18)
 
 1. Teacher creates a published Exam, active classroom and monitored CLASS_RESTRICTED Session assigned to that class (PUBLIC and zero-class monitoring rejected). Use two recording configurations in separate disposable sessions: full recording OFF+clip ON and full recording ON.
 2. Five consenting adults sign off notice covering camera, AI observations, snapshots, video, rolling buffer, retention and review; each uses a separate user account on a separate PHYSICAL camera device. No OBS, virtual/fake device flags, prerecorded camera source or copying a single sensor into five tracks.
 3. Each browser allows real camera permission, sees preview, completes server preflight and starts the Attempt. Verify video-only publication and live teacher authorization.
 4. At ONE timestamp, teacher sees five LIVE subscribed tiles with decoded frames; record anonymized publisher identity, distinct deviceId SHA-256 pseudonym, trackSid, connectedAt, disconnectedAt, measured FPS, number decoded frames and teacher-grid screenshot. All five camera lifetimes must enclose the SAME teacher grid observedAt.
-5. A separate adult reviewer witnesses five physically different sensors (offline serial verification if necessary; never upload serials or labels) and confirms no synthetic media. Document exact number, not a guessed ten.
+5. A separate adult reviewer witnesses (a) the iPhone physically streaming into iVCam (live scene + iVCam watermark) and (b) the built-in camera as a distinct sensor. Never upload serials, labels or faces.
 6. Capture anonymized WebRTC stats, SFU CPU/RAM/bandwidth, Chrome getStats samples, frontend/Backend timings and measured reconnect latencies. Do not mistake frames published for frames actually decoded by the teacher.
 
 ## 4. Actual AI and evidence — both recording policies
