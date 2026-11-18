@@ -1,6 +1,6 @@
 # P4 — Engineering, Demo Security and Final Acceptance Gates
 
-**Status:** Proposed execution gate matrix; design-only. No tests have been run by producing this document.
+**Status:** P4 gate matrix EXECUTED — Phase 4 CLOSED AS COMPLETED (owner approval 2026-11-18; merge SHAs and post-merge CI in P4F_SCOPE_DECISIONS.md). This matrix remains the reference for future phases.
 
 ## 1. Mandatory autonomous engineering loop
 

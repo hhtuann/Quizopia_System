@@ -1,6 +1,6 @@
 # P4-F1 Independent Security and Reliability Review Checklist
 
-**Status: OPEN REVIEW PLAN; NO PASS CLAIMS.** Scope [#97](https://github.com/hhtuann/Quizopia_System/issues/97). Review against exact current Backend/Frontend PR HEADs and merged System gitlinks. Do not infer tested behavior from class or test file names. A second reviewer should reproduce negatives with two unrelated demo accounts and an isolated session; document observed status codes and redacted traces.
+**Status: EXECUTED & CLOSED (2026-11-18).** Scope [#97](https://github.com/hhtuann/Quizopia_System/issues/97) — CLOSED. Outcome: independent review of Backend `36880db` found **no P0/P1/P2** (4×P3 fixed in PR #30 with targeted regression); live IDOR probe 7/7 standard + 12/12 extended negatives PASS on the running stack; four review rounds closed with zero open findings. Full details on #97 and in P4F_SCOPE_DECISIONS.md. The checklist below is preserved as the executed review plan.
 
 ## Threat model and evidence assignments
 
@@ -36,9 +36,9 @@ All tests should use isolated consenting accounts. Do not disable authentication
 
 ## P4-F1 decision rules
 
-Security GO requires no open P0/P1/P2, verified cross-user/stream/evidence negatives, replay/expiry outcomes, honest 30/90 retention and demo purge, no grading impact, no default audio or hidden recording. Missing private media proof or independent review is **NO-GO**, even if CI is green.
+Security GO requires no open P0/P1/P2, verified cross-user/stream/evidence negatives, replay/expiry outcomes, honest 30/90 retention and demo purge, no grading impact, no default audio or hidden recording. Missing private media proof or independent review is **NO-GO**, even if CI is green. **All conditions were met at closure (2026-11-18).**
 
-The original independent LiveKit-subscribing Python worker [#88](https://github.com/hhtuann/Quizopia_System/issues/88) does not exist: the implemented deployment is browser-first CLIENT_MODEL observations plus authenticated Backend worker-compatible callback. Never describe worker-specific fault injection as executed; defer or change scope only by explicit owner decision. This review is for the academic demo, not production certification.
+The original independent LiveKit-subscribing Python worker [#88](https://github.com/hhtuann/Quizopia_System/issues/88) does not exist: the implemented deployment is browser-first CLIENT_MODEL observations plus authenticated Backend worker-compatible callback. Never describe worker-specific fault injection as executed; defer or change scope only by explicit owner decision. This review is for the academic demo, not production certification. **Owner Option A decision 2026-11-18: #88 closed as not planned; worker deferred to POST-P4 #111.**
 
 
 ## Local live HTTP authorization probe (additional P4-F1 executable)
