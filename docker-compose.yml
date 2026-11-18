@@ -58,14 +58,37 @@ services:
       # (see .env.example). Empty values make the backend fail fast on start.
       QUIZOPIA_JWT_SECRET_BASE64: ${QUIZOPIA_JWT_SECRET_BASE64:-}
       QUIZOPIA_DATA_ENCRYPTION_KEY_BASE64: ${QUIZOPIA_DATA_ENCRYPTION_KEY_BASE64:-}
-      # No usable default: a blank value makes the backend fail fast on start,
-      # forcing a real invite code to be supplied via the local .env file.
-      QUIZOPIA_TEACHER_INVITE_CODE: ${QUIZOPIA_TEACHER_INVITE_CODE:-}
+      # Teacher invite code was removed in Identity M1; do not forward it.
       QUIZOPIA_ALLOWED_ORIGINS: ${QUIZOPIA_ALLOWED_ORIGINS:-http://localhost:3000}
       QUIZOPIA_COOKIE_SECURE: ${QUIZOPIA_COOKIE_SECURE:-false}
-      # Seed demo accounts (1 per role) + demo classroom on first startup.
-      # Leave false for production. See README "Demo accounts".
       QUIZOPIA_DEMO_DATA_ENABLED: ${QUIZOPIA_DEMO_DATA_ENABLED:-false}
+      # Identity M1/M5: forward settings from the System root .env.
+      # Backend connects to the Mailpit SERVICE, never localhost inside Docker.
+      QUIZOPIA_SMTP_HOST: ${QUIZOPIA_SMTP_HOST:-mailpit}
+      QUIZOPIA_SMTP_PORT: ${QUIZOPIA_SMTP_PORT:-1025}
+      QUIZOPIA_MAIL_FROM: ${QUIZOPIA_MAIL_FROM:-Quizopia <no-reply@quizopia.local>}
+      QUIZOPIA_PASSWORD_RESET_FRONTEND_BASE_URI: ${QUIZOPIA_PASSWORD_RESET_FRONTEND_BASE_URI:-http://localhost:3000}
+      QUIZOPIA_GOOGLE_CLIENT_ID: ${QUIZOPIA_GOOGLE_CLIENT_ID:-}
+      QUIZOPIA_GOOGLE_CLIENT_SECRET: ${QUIZOPIA_GOOGLE_CLIENT_SECRET:-}
+      QUIZOPIA_OAUTH_FRONTEND_REDIRECT_URL: ${QUIZOPIA_OAUTH_FRONTEND_REDIRECT_URL:-http://localhost:3000/auth/callback}
+      QUIZOPIA_OAUTH_REDIRECT_BASE_URI: ${QUIZOPIA_OAUTH_REDIRECT_BASE_URI:-http://localhost:8080}
+      # P4 monitoring / LiveKit / evidence (feature flags remain OFF by default).
+      QUIZOPIA_AI_INGEST_KEY: ${QUIZOPIA_AI_INGEST_KEY:-}
+      QUIZOPIA_LIVEKIT_ENABLED: ${QUIZOPIA_LIVEKIT_ENABLED:-false}
+      QUIZOPIA_LIVEKIT_API_KEY: ${QUIZOPIA_LIVEKIT_API_KEY:-devquizopia}
+      QUIZOPIA_LIVEKIT_API_SECRET: ${QUIZOPIA_LIVEKIT_API_SECRET:-}
+      QUIZOPIA_LIVEKIT_HTTP_URL: ${QUIZOPIA_LIVEKIT_HTTP_URL:-http://host.docker.internal:7880}
+      QUIZOPIA_LIVEKIT_WS_URL: ${QUIZOPIA_LIVEKIT_WS_URL:-ws://localhost:7880}
+      QUIZOPIA_EVIDENCE_MINIO_ENDPOINT: ${QUIZOPIA_EVIDENCE_MINIO_ENDPOINT:-http://minio:9000}
+      QUIZOPIA_EVIDENCE_MINIO_EGRESS_ENDPOINT: ${QUIZOPIA_EVIDENCE_MINIO_EGRESS_ENDPOINT:-http://host.docker.internal:9000}
+      QUIZOPIA_EVIDENCE_MINIO_ACCESS_KEY: ${QUIZOPIA_EVIDENCE_MINIO_ACCESS_KEY:-}
+      QUIZOPIA_EVIDENCE_MINIO_SECRET_KEY: ${QUIZOPIA_EVIDENCE_MINIO_SECRET_KEY:-}
+      QUIZOPIA_EVIDENCE_BUCKET: ${QUIZOPIA_EVIDENCE_BUCKET:-quizopia-evidence}
+      QUIZOPIA_FFMPEG_COMMAND: ${QUIZOPIA_FFMPEG_COMMAND:-ffmpeg}
+      # P5 AI Authoring (OpenAI; endpoints implemented separately in Phase 5).
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.4-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
 
     ports:
       - "8080:8080"
@@ -78,6 +101,9 @@ services:
 
     networks:
       - quizopia_network
+    # For P4 LiveKit when it is running on the Docker host / separate stack.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
     build:
@@ -86,12 +112,12 @@ services:
       args:
         # NEXT_PUBLIC_* phải được inject LÚC BUILD để Next.js inline vào client bundle.
         # Phải là URL browser-reachable (localhost:8080), KHÔNG phải hostname nội bộ Docker.
-        NEXT_PUBLIC_API_URL: http://localhost:8080
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
     container_name: quizopia_frontend
     restart: unless-stopped
 
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
 
     ports:
       - "3000:3000"
