@@ -18,7 +18,7 @@
 | P4-C | Signed AI callback/dedupe + isolated stub test + **separate real-model evaluation** | AI accuracy from fake/model-stub alone |
 | P4-D | S3 private access, snapshot checksum, egress final MP4/segments, rolling-buffer clip, playback seek, deletion test | Recording available from an egress-start acknowledgement |
 | P4-E | Durable unified timeline/teacher report/review, browser reconnect and accessibility tests | Frontend feed of 20 messages is full history |
-| P4-F | End-to-end **5 real publishers + target 10**, real-model detections, failure injection, privacy basics, access controls and local demo runbook | Production readiness or 30/50/100 stream scale |
+| P4-F | End-to-end **2 physical-source cameras + 5 simulated publishers** (amendment 2026-11-18), real-model detections, failure injection, privacy basics, access controls and local demo runbook | Production readiness or 30/50/100 stream scale |
 
 ## 3. Core Testcontainers matrix
 
@@ -97,12 +97,12 @@ Measured using explicit fixture and hardware: concurrent publishers, browsers/vi
 
 ## 9. Definition of Done
 
-All Phase 4 features work with measured actual E2E evidence (5 real publishers mandatory, 10 target), basic access controls and repeatable local demo script; issues and regression QA green; media/evidence retention works; no P0/P1/P2 **functional/security** blockers; existing exam correctness remains; owner approval separates merge/deployment. A mock-only AI demo **does not** complete Phase 4. Formal production legal approval and 30/50/100 load are not academic-demo blockers.
+All Phase 4 features work with measured actual E2E evidence (2 physical-source cameras + 5 simulated publishers per the 2026-11-18 amendment), basic access controls and repeatable local demo script; issues and regression QA green; media/evidence retention works; no P0/P1/P2 **functional/security** blockers; existing exam correctness remains; owner approval separates merge/deployment. A mock-only AI demo **does not** complete Phase 4. Formal production legal approval and 30/50/100 load are not academic-demo blockers.
 
 
 ## 10. Academic demo acceptance evidence (v1.1)
 
-**Required media proof:** two browsers with distinct identities + five simultaneous real camera publishers, teacher live grid, selective subscriptions and camera disconnect/reconnect. Target ten publishers if the local machine/network permits. Record the count exactly rather than claiming ten if only five pass.
+**Required media proof (amendment 2026-11-18):** two browsers with distinct identities + **two simultaneous independent real camera SOURCES** (built-in BisonCam NB Pro + live iPhone via e2eSoft iVCam — virtual driver, physical phone sensor) publishing as separate Students/Attempts, teacher live grid decoding NEW frames on both exact trackSIDs, selective subscriptions and camera disconnect/reconnect. **Separately:** five SIMULATED publishers over real LiveKit/WebRTC as a labeled benchmark (never counted as physical). Record counts and labels exactly.
 
 **Required AI proof:** separately show raw real-model detections and aggregated alerts for a phone and multiple people, with actual inference latency on recorded hardware. Stub worker can validate transport/idempotency but must never satisfy this gate. Gaze detection optional until validated.
 

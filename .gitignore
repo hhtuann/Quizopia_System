@@ -1,0 +1,17 @@
+# Local secrets — never commit (backend fails fast without real values).
+.env
+.env.*
+!.env.example
+
+# Private E2E evidence (PII, faces, device labels, tokens).
+frontend/e2e/evidence/
+frontend/e2e/.smoke-*.json
+frontend/e2e-results/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+Thumbs.db
+.DS_Store
