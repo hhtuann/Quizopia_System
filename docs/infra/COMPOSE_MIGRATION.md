@@ -51,15 +51,39 @@ Run from the System repo root. NEVER use `docker compose down -v` at any point.
    QUIZOPIA_EVIDENCE_MINIO_EGRESS_ENDPOINT=http://minio:9000
    ```
 
-3. **Stop the legacy media stack** (keeps everything; removes only containers
-   and its network):
+3. **Stop the legacy media stack** (removes only its containers and network —
+   never its volumes; the legacy stack had no persistent data anyway):
+
+   **Pre-upgrade (the consolidation PR is not merged yet and
+   `docker-compose.livekit.yml` is still in your working tree):**
 
    ```powershell
-   docker compose -p quizopia-media --env-file .env.livekit -f docker-compose.livekit.yml down
-   # If you used the local Windows ICE overrides, also:
+   docker compose -p quizopia-media --env-file .env.livekit -f docker-compose.livekit.yml --profile egress down
+   # If you used the local Windows ICE overrides, add BOTH override files:
    docker compose -p quizopia-media --env-file .env.livekit -f docker-compose.livekit.yml `
-     -f docker-compose.livekit.windows-override.yml --profile egress down
-   docker ps -a --filter name=quizopia_livekit   # must list nothing
+     -f docker-compose.livekit.windows-override.yml -f docker-compose.livekit.windows-override2.yml --profile egress down
+   ```
+
+   **Post-upgrade (PR #118 deleted `docker-compose.livekit.yml` from the
+   repo):** recover the file from git history into a scratch name and stop
+   with that — or remove the project's containers directly:
+
+   ```powershell
+   # Option A: exact original definition
+   git show <pre-consolidation-commit>:docker-compose.livekit.yml > .legacy-livekit.compose.yml
+   docker compose -p quizopia-media -f .legacy-livekit.compose.yml --profile egress down
+   Remove-Item .legacy-livekit.compose.yml
+
+   # Option B: no compose file needed (containers + network only)
+   docker ps -aq --filter 'label=com.docker.compose.project=quizopia-media' | ForEach-Object { docker rm -f $_ }
+   docker network rm quizopia_livekit_net 2>$null
+   ```
+
+   Either way, verify afterwards:
+
+   ```powershell
+   docker ps -a --filter 'label=com.docker.compose.project=quizopia-media'   # must list nothing
+   docker volume ls -q | Select-String quizopia-media                        # volumes untouched
    ```
 
 4. **Validate + start the consolidated stack**:
@@ -98,12 +122,16 @@ up` on the consolidated stack fails with `port is already allocated` or
 
 ```powershell
 docker compose --profile monitoring --profile recording down   # no -v!
-git checkout <pre-consolidation-commit> -- docker-compose.yml infra/livekit
+git checkout <pre-consolidation-commit> -- docker-compose.yml docker-compose.livekit.yml infra/livekit
 docker compose up -d
+# LiveKit secrets for the legacy stack come from your private .env.livekit
+# backup (see step 6); if you kept the file, `--env-file .env.livekit` works:
 docker compose --env-file .env.livekit -f docker-compose.livekit.yml up -d
 ```
 
-Volumes were never touched, so both directions are lossless.
+Volumes were never touched, so both directions are lossless. The
+`pre-consolidation-commit` is the merge-base of PR #118 — any commit that
+still contains `docker-compose.livekit.yml` works.
 
 ## Known Windows caveat: Hyper-V UDP exclusions
 

@@ -92,6 +92,7 @@ Repository gốc dùng **git submodules** cho backend và frontend:
 ├── scripts/            # start-demo.ps1 / stop-demo.ps1 / status-demo.ps1
 ├── .env.example        # template biến môi trường (copy → .env)
 └── README.md
+```
 
 ---
 
