@@ -1,5 +1,7 @@
 # P4-F Evidence Manifest — Version 1
 
+> **Closure note (2026-11-18):** Phase 4 was closed by owner approval with the amendment gate evidence (two physical sources + five-simulated benchmark) verified in the private archive. The filled manifest itself stays PRIVATE and was never committed; this schema document is the contract for any future re-run.
+
 **PRIVATE evidence index only.** Required by [P4-F2 #98](https://github.com/hhtuann/Quizopia_System/issues/98) and [P4-F1 #97](https://github.com/hhtuann/Quizopia_System/issues/97). Never commit a filled manifest with PII, camera device labels, secrets, presigned URLs, photos, student video, or private security test material.
 
 The Python standard-library validation tool is in scripts/p4f_gate.py. It checks that required evidence has been **declared** consistently; it CANNOT authenticate the camera devices, check that referenced MP4s exist, confirm a test run, grant legal rights or replace an independent reviewer.
