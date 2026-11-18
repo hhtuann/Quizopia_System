@@ -8,6 +8,13 @@ frontend/e2e/evidence/
 frontend/e2e/.smoke-*.json
 frontend/e2e-results/
 
+# Local AI-tool / editor configuration (may contain connection strings).
+/.mcp.json
+/.vscode/
+
+# Generated output of scripts/build-docs-site.py (website/ is the source).
+/site/
+
 # Python
 __pycache__/
 *.pyc
