@@ -82,14 +82,16 @@ Backend modules: `identity`, `authentication`, `security`, `user`, `academic`, `
 Repository gốc dùng **git submodules** cho backend và frontend:
 
 ```text
-Quizopia_System/
 ├── backend/            # submodule → Quizopia_Backend (Spring Boot)
 ├── frontend/           # submodule → Quizopia_Frontend (Next.js)
 ├── .gitmodules         # submodule config
-├── docker-compose.yml  # orchestration: postgres, redis, minio, mailpit, backend, frontend
+├── docker-compose.yml  # ONE stack: postgres, redis, minio, mailpit, backend,
+│                       #   frontend + profiles: monitoring (livekit),
+│                       #   recording (egress), test (backend-test)
+├── infra/livekit/      # livekit.yaml + egress.yaml (rendered at launch)
+├── scripts/            # start-demo.ps1 / stop-demo.ps1 / status-demo.ps1
 ├── .env.example        # template biến môi trường (copy → .env)
 └── README.md
-```
 
 ---
 
@@ -144,11 +146,33 @@ For changes to backend Java code/image, use `docker compose up -d --build backen
 
 **Mailpit inside Compose:** set `QUIZOPIA_SMTP_HOST=mailpit` (not `localhost`); backend running directly on the host should use `localhost`.
 
-**3. Khởi chạy:**
+**3. Khởi chạy** (một file Compose duy nhất, dùng profile):
 
 ```bash
-docker compose up --build
+# Core: frontend + backend + postgres + redis + minio + mailpit
+docker compose up -d --build
+
+# + giám sát camera (LiveKit SFU + livekit-redis)
+docker compose --profile monitoring up -d --build
+
+# + giám sát & ghi hình (thêm Egress)
+docker compose --profile monitoring --profile recording up -d --build
 ```
+
+Hoặc dùng script PowerShell (có preflight secrets + cảnh báo port Windows):
+
+```powershell
+.\scripts\start-demo.ps1                     # core
+.\scripts\start-demo.ps1 -Mode monitoring    # + camera monitoring
+.\scripts\start-demo.ps1 -Mode recording     # + monitoring + recording
+.\scripts\status-demo.ps1                    # trạng thái + URL
+.\scripts\stop-demo.ps1                      # stop, KHÔNG xóa volume
+```
+
+Camera path của backend mặc định OFF. Với demo giám sát đặt
+`QUIZOPIA_LIVEKIT_ENABLED=true` và điền `QUIZOPIA_LIVEKIT_API_SECRET` trong
+`.env` (xem `infra/livekit/README.md`). Recording vẫn OFF theo mặc định, chỉ
+bật per-session trong ứng dụng.
 
 Sau khi các service healthy:
 
@@ -156,10 +180,13 @@ Sau khi các service healthy:
 |---------|-----|
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8080 |
-| MinIO console | http://localhost:9001 (minioadmin / minioadmin123) |
+| MinIO console | http://localhost:9001 (đăng nhập bằng `QUIZOPIA_MINIO_ROOT_*` trong `.env`) |
 | Mailpit (email) | http://localhost:8025 |
+| LiveKit signaling (profile `monitoring`) | ws://localhost:7880 |
 
 > Backend fail-fast nếu `QUIZOPIA_JWT_SECRET_BASE64` hoặc `QUIZOPIA_DATA_ENCRYPTION_KEY_BASE64` để trống — phải sinh giá trị thật trong `.env`.
+>
+> KHÔNG BAO GIỜ chạy `docker compose down -v` — nó xóa vĩnh viễn dữ liệu PostgreSQL/Redis/MinIO.
 
 ---
 
@@ -221,7 +248,38 @@ Phân quyền 3 lớp:
 - **Không lộ đáp án**: API học sinh không bao giờ trả `correctAnswer`.
 - **Default deny**: kiểm tra quyền + ownership + state tại backend cho mọi request; integration test cho từng cặp vai trò–endpoint.
 
+
 ---
+
+## LAN demo (chuẩn bị demo qua mạng LAN)
+
+Mặc định mọi URL hướng ra browser dùng `localhost` (Mode A — demo 1 máy).
+Để một máy thứ hai truy cập qua LAN IP của host (Mode B), đổi CÁC giá trị
+browser-facing trong `.env` thành IP LAN của host (ví dụ `192.168.1.10`) rồi
+rebuild/recreate:
+
+| Biến trong `.env` | Giá trị LAN |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://192.168.1.10:8080` (rebuild frontend) |
+| `QUIZOPIA_ALLOWED_ORIGINS` | `http://192.168.1.10:3000` |
+| `QUIZOPIA_PASSWORD_RESET_FRONTEND_BASE_URI` | `http://192.168.1.10:3000` |
+| `QUIZOPIA_OAUTH_FRONTEND_REDIRECT_URL` | `http://192.168.1.10:3000/auth/callback` |
+| `QUIZOPIA_LIVEKIT_WS_URL` | `ws://192.168.1.10:7880` |
+| `QUIZOPIA_EVIDENCE_MINIO_PUBLIC_ENDPOINT` | `http://192.168.1.10:9000` (presigned playback URLs) |
+| `LIVEKIT_RTC_NODE_IP` | `192.168.1.10` (ICE candidates phải advertise IP LAN) |
+
+Mở firewall cho: TCP 3000, 8080, 7880, 7881 và UDP 3478 + khoảng ICE
+(`LIVEKIT_RTC_PORT_START..END`, mặc định 50100-50200).
+
+**Giới hạn bảo mật browser (quan trọng):** `getUserMedia()` (camera) chỉ chạy
+trong secure context — `http://localhost` hợp lệ, nhưng `http://192.168.x.x`
+KHÔNG hợp lệ trên máy từ xa. Camera thật qua LAN bắt buộc HTTPS/TLS (reverse
+proxy + certificate, vd. Caddy/nginx + cert nội bộ). Đây là việc triển khai
+ngoài phạm vi hợp nhất Compose này — đã ghi nhận là follow-up proposed;
+không cố bypass bằng flag browser khi demo chính thức. Các luồng không-camera
+(đăng nhập, làm bài, giám sát dashboard) chạy được qua plain HTTP LAN.
+
+Chi tiết mạng/migration: `docs/infra/COMPOSE_MIGRATION.md` và `infra/livekit/README.md`.
 
 ## Kiểm thử
 

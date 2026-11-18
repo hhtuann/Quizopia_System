@@ -1,39 +1,43 @@
-# Quizopia Media Infrastructure (P4-B1, issue #84)
+# Quizopia Media Infrastructure (Phase 4)
 
 Self-hosted [LiveKit](https://livekit.io) SFU for monitored exam sessions — one
-opaque room per Exam Session (ADR-008 D2/D3). This stack is deliberately
-**separate** from the owner's `docker-compose.yml`; nothing in it modifies the
-existing Quizopia services, volumes or networks.
+opaque room per Exam Session (ADR-008 D2/D3). LiveKit now runs in the **root
+`docker-compose.yml`** as the `monitoring` profile (Egress behind the
+`recording` profile). The former standalone `docker-compose.livekit.yml` stack
+was retired; migration notes live in
+[docs/infra/COMPOSE_MIGRATION.md](../../docs/infra/COMPOSE_MIGRATION.md).
 
 ## Layout
 
 | File | Purpose |
 |---|---|
-| `docker-compose.livekit.yml` (System root) | `livekit` + dedicated `livekit-redis`; `egress` behind the `egress` profile (P4-D placeholder) |
-| `infra/livekit/livekit.yaml` | SFU config: ports, redis, webhook, TURN. `${LIVEKIT_API_SECRET}` is rendered from container env at launch (livekit does NOT expand `${...}` itself) |
-| `infra/livekit/egress.yaml` | Egress wiring for P4-D (S3/MinIO section commented — activated then) |
-| `.env.livekit` (gitignored) | `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` — generated once with `openssl rand -hex 24` |
+| `docker-compose.yml` (System root) | `livekit` + dedicated `livekit-redis` (`monitoring` profile) and `egress` (`recording` profile) on the shared `quizopia_network` |
+| `infra/livekit/livekit.yaml` | SFU config: ports, redis, webhook, TURN. `${...}` placeholders are rendered from container env at launch (livekit does NOT expand them itself) |
+| `infra/livekit/egress.yaml` | Egress wiring: redis + SFU + LiveKit credentials. Recording storage is passed per request by the backend (MinIO/S3) |
+| `.env` (System root, gitignored) | `QUIZOPIA_LIVEKIT_API_KEY` / `QUIZOPIA_LIVEKIT_API_SECRET` — the single credential pair shared by backend, SFU and Egress (was `.env.livekit`, retired) |
 
 ## Start / stop
 
-```bash
-# from the System repo root
-docker compose --env-file .env.livekit -f docker-compose.livekit.yml up -d
-docker logs -f quizopia_livekit        # "starting LiveKit server ... portHttp: 7880"
-curl http://localhost:7880             # -> "OK"
+```powershell
+# monitoring (LiveKit + livekit-redis)
+docker compose --profile monitoring up -d --build
 
-# stop (keeps nothing — redis runs in-memory; room state is rebuilt from Postgres bindings)
-docker compose --env-file .env.livekit -f docker-compose.livekit.yml down
+# monitoring + recording (Egress)
+docker compose --profile monitoring --profile recording up -d --build
+
+# status / stop (never deletes volumes)
+.\scripts\status-demo.ps1
+.\scripts\stop-demo.ps1
 ```
 
-Backend wiring (dev/E2E, backend runs on the host):
+Backend wiring (backend container, root `.env`):
 
 ```
 QUIZOPIA_LIVEKIT_ENABLED=true
-QUIZOPIA_LIVEKIT_API_KEY=devquizopia          # must match .env.livekit
-QUIZOPIA_LIVEKIT_API_SECRET=<same secret>
-QUIZOPIA_LIVEKIT_HTTP_URL=http://localhost:7880   # Twirp RoomService (server→SFU)
-QUIZOPIA_LIVEKIT_WS_URL=ws://localhost:7880       # handed to browsers
+QUIZOPIA_LIVEKIT_API_KEY=devquizopia          # must match SFU keys entry
+QUIZOPIA_LIVEKIT_API_SECRET=<same secret>     # single pair for backend+SFU+egress
+QUIZOPIA_LIVEKIT_HTTP_URL=http://livekit:7880 # Twirp RoomService (service DNS)
+QUIZOPIA_LIVEKIT_WS_URL=ws://localhost:7880   # handed to browsers (host-reachable)
 ```
 
 `quizopia.media.livekit.enabled=false` (default) keeps the whole camera path
@@ -48,11 +52,33 @@ dormant — preflight endpoints answer 503 and schedulers idle.
 | 3478 | UDP | embedded TURN relay |
 | 50100–50200 | UDP | WebRTC ICE media range (sized for ≤10 publishers; widen for scale tests) |
 
-- `getUserMedia` requires a secure context: `http://localhost` qualifies; any
-  LAN deployment needs TLS (documented deployment step, out of local scope).
-- Webhook delivery: SFU → `http://host.docker.internal:8080/internal/media/v1/livekit/webhooks`
-  (backend on the Docker host). If the backend ever runs inside compose, change
-  this URL to the backend service name.
+All container-to-container traffic uses Compose service DNS on
+`quizopia_network`:
+
+- Backend → SFU RoomService: `http://livekit:7880`
+- SFU → backend webhooks: `http://backend:8080/internal/media/v1/livekit/webhooks`
+  (signed; override with `LIVEKIT_WEBHOOK_URL` for host-run backends)
+- Egress → SFU `ws://livekit:7880`, Redis `livekit-redis:6379`, MinIO `http://minio:9000`
+
+`getUserMedia` requires a secure context: `http://localhost` qualifies; any
+LAN deployment needs TLS (documented in the README "LAN demo" section — a
+deployment step, out of local scope).
+
+### Windows note: dynamic UDP exclusions
+
+Hyper-V/WSL can reserve parts of the dynamic UDP range
+(`netsh interface ipv4 show excludedportrange protocol=udp`), and the reserved
+window MOVES after reboots. If `docker compose up` fails to bind the ICE
+range, override BOTH values in `.env` to a free range, e.g.:
+
+```
+LIVEKIT_RTC_PORT_START=52000
+LIVEKIT_RTC_PORT_END=52100
+```
+
+The compose file moves the published host ports and the `rtc.port_range`
+config together. `scripts/start-demo.ps1` warns when the configured range
+overlaps a current exclusion window.
 
 ## ICE / TURN behaviour and test
 
@@ -80,15 +106,18 @@ dormant — preflight endpoints answer 503 and schedulers idle.
   (renewal denied + RemoveParticipant), rejoin exposure window measured in
   the P4-B tests; do not claim absolute revocation.
 
-## Egress (prepared, NOT active — P4-D)
+## Egress (recording profile)
 
-```bash
-docker compose --env-file .env.livekit -f docker-compose.livekit.yml --profile egress up -d
+```powershell
+docker compose --profile monitoring --profile recording up -d --build
 ```
 
-`egress.yaml` pre-wires redis + API credentials and documents the private
-MinIO/S3 output buckets (`monitoring/recordings` etc.). P4-D fills storage
-credentials and starts the service; P4-B ships no recording features.
+`egress.yaml` wires redis + the SFU connection + the LiveKit credential pair
+(rendered at launch). Recording destinations are NOT in this file: the Quizopia
+backend passes the private MinIO/S3 destination (endpoint + credentials +
+bucket, `quizopia.media.storage.egress-endpoint` → `http://minio:9000` inside
+the shared network) inside every Start/Stop request. Recording stays OFF by
+default; it is enabled per Exam Session recording configuration.
 
 ## 5-publisher demo environment
 
@@ -105,13 +134,16 @@ To reproduce the 5-publisher demo:
    completes preflight → publish → start attempt.
 4. Teacher opens the session detail page → Camera grid shows 5 tiles at LOW
    layer; open one fullscreen (HIGH layer).
-   Scaling to 10 = 10 contexts; widen `rtc.port_range` if needed.
+   Scaling to 10 = 10 contexts; widen `LIVEKIT_RTC_PORT_START/END` if needed.
 
 ## Security notes
 
-- API secret only in `.env.livekit` + backend env; never in the frontend
-  bundle or Git (`git check-ignore .env.livekit` confirms).
+- API secret only in the System root `.env` + backend env; never in the
+  frontend bundle or Git (`git check-ignore .env` confirms; `.env.*` ignored,
+  `!.env.example` whitelisted).
 - Webhook ingress verifies HS256 signature + body sha256 + freshness
   (`media/webhook/LiveKitWebhookVerifier`); rejects with 401 and no detail.
 - No media frames transit the backend (Spring only issues tokens and reads
   RoomService state).
+- Egress recordings land only in the private evidence bucket; playback via
+  short-lived, teacher-scoped presigned URLs issued by the backend.

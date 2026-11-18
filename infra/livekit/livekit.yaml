@@ -1,15 +1,19 @@
 # LiveKit self-hosted SFU — Quizopia P4-B1 (issue #84, ADR-008 D2/D3).
 #
-# Local/dev profile only. Rendering: values in ${...} are expanded from the
-# environment supplied by docker-compose.livekit.yml (env_file: .env.livekit,
-# which is gitignored). No secrets are committed.
+# Local/dev profile only. The root docker-compose.yml renders the ${...}
+# placeholders below into a container-local /tmp/livekit.yaml at launch
+# (livekit-server does NOT expand env vars in its config itself). Defaults
+# come from the compose service; override per-host via the root .env.
 #
 # Ports (see infra/livekit/README.md):
 #   7880  HTTP + WebSocket signaling (browsers connect here)
 #   7881  WebRTC-over-TCP fallback
 #   3478/udp  embedded TURN (relay path for restrictive networks)
-#   50100-50200/udp  WebRTC UDP media range (narrow range is fine for <=10
-#                    publishers; widen for the P4-F scale experiments)
+#   LIVEKIT_RTC_PORT_START..END/udp  WebRTC ICE media range (default
+#       50100-50200 is fine for <=10 publishers; on Windows check
+#       `netsh interface ipv4 show excludedportrange protocol=udp` —
+#       Hyper-V dynamic exclusions can cover the default range after a
+#       reboot; override LIVEKIT_RTC_PORT_START/END in .env to move it)
 
 port: 7880
 bind_addresses:
@@ -17,31 +21,32 @@ bind_addresses:
 
 rtc:
   tcp_port: 7881
-  port_range_start: 50100
-  port_range_end: 50200
+  port_range_start: ${LIVEKIT_RTC_PORT_START}
+  port_range_end: ${LIVEKIT_RTC_PORT_END}
   # Browsers run on the Docker HOST in this demo: advertise loopback so ICE
-  # never selects the container-internal address (172.18.x.x is unreachable
+  # never selects the container-internal address (172.x.x.x is unreachable
   # from the host — real-camera publisher DTLS times out on it). Docker's
-  # published ports (50100-50200, 7881, 3478) forward loopback into the
-  # container. For LAN demo browsers, set this to the host's LAN IP instead.
-  node_ip: 127.0.0.1
+  # published ports (ICE UDP range, 7881, 3478) forward loopback into the
+  # container. For LAN demo browsers, set LIVEKIT_RTC_NODE_IP to the host's
+  # LAN IP instead (see README "LAN demo" section).
+  node_ip: ${LIVEKIT_RTC_NODE_IP}
   use_external_ip: false
 
 redis:
   address: livekit-redis:6379
 
-# Key name must match LIVEKIT_API_KEY; secret is injected from the env.
-# (If your livekit-server build does not expand env vars in the config,
-# docker-compose.livekit.yaml falls back to --key/--secret CLI flags.)
+# Key name must match QUIZOPIA_LIVEKIT_API_KEY; secret comes from the env.
 keys:
-  devquizopia: ${LIVEKIT_API_SECRET}
+  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
 
 # Signed webhook delivery to the Quizopia backend (P4-B4, issue #87).
-# Backend runs on the host during dev/E2E, hence host.docker.internal.
+# Default target is the backend service inside the unified Compose network;
+# point LIVEKIT_WEBHOOK_URL at host.docker.internal:8080 when the backend
+# runs directly on the host (E2E workflows).
 webhook:
-  api_key: devquizopia
+  api_key: ${LIVEKIT_API_KEY}
   urls:
-    - http://host.docker.internal:8080/internal/media/v1/livekit/webhooks
+    - ${LIVEKIT_WEBHOOK_URL}
 
 # TURN relay for ICE-restricted student networks. UDP TURN needs no TLS
 # certificate; TLS TURN (turns:) requires a real domain+cert and is a
