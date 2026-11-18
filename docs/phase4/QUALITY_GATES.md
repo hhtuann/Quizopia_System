@@ -18,7 +18,7 @@
 | P4-C | Signed AI callback/dedupe + isolated stub test + **separate real-model evaluation** | AI accuracy from fake/model-stub alone |
 | P4-D | S3 private access, snapshot checksum, egress final MP4/segments, rolling-buffer clip, playback seek, deletion test | Recording available from an egress-start acknowledgement |
 | P4-E | Durable unified timeline/teacher report/review, browser reconnect and accessibility tests | Frontend feed of 20 messages is full history |
-| P4-F | End-to-end **5 real publishers + target 10**, real-model detections, failure injection, privacy basics, access controls and local demo runbook | Production readiness or 30/50/100 stream scale |
+| P4-F | End-to-end **2 physical-source cameras + 5 simulated publishers** (amendment 2026-11-18), real-model detections, failure injection, privacy basics, access controls and local demo runbook | Production readiness or 30/50/100 stream scale |
 
 ## 3. Core Testcontainers matrix
 

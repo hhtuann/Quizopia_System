@@ -2,7 +2,7 @@
 
 **Status: PROCEDURE, NOT EXECUTED EVIDENCE.** Scope: [Epic #77](https://github.com/hhtuann/Quizopia_System/issues/77), [P4-F1 #97](https://github.com/hhtuann/Quizopia_System/issues/97), [P4-F2 #98](https://github.com/hhtuann/Quizopia_System/issues/98). **Product Owner amendment 2026-11-18:** the physical gate is **TWO simultaneous independent real camera SOURCES** — the built-in BisonCam NB Pro plus a live iPhone camera delivered via e2eSoft iVCam (a Windows virtual driver whose source is a physical phone sensor; the driver being virtual does NOT disqualify it). OBS/loopback/synthetic Chromium devices never qualify. Separately, five SIMULATED publishers over real LiveKit/WebRTC form a labeled benchmark section and are never counted as physical sources.
 
-Academic demo only: consenting adults or approved synthetic media (synthetic does not satisfy the five-device gate). No real-student rollout, hidden recording, microphone by default, public media, auto-cheating verdict or grade impact. Recording OFF by default; media/evidence retention 30 days and activity/review metadata 90 days.
+Academic demo only: consenting adults or approved synthetic media (synthetic does not satisfy the two-physical-source gate). No real-student rollout, hidden recording, microphone by default, public media, auto-cheating verdict or grade impact. Recording OFF by default; media/evidence retention 30 days and activity/review metadata 90 days.
 
 ## 1. Preserve baseline and prepare isolated environment
 
@@ -44,9 +44,9 @@ The Playwright config uses Chromium fake-device flags, and cannot satisfy #98 ha
 ## 3. Two physical-source cameras: mandatory witnessed gate (amendment 2026-11-18)
 
 1. Teacher creates a published Exam, active classroom and monitored CLASS_RESTRICTED Session assigned to that class (PUBLIC and zero-class monitoring rejected). Use two recording configurations in separate disposable sessions: full recording OFF+clip ON and full recording ON.
-2. Five consenting adults sign off notice covering camera, AI observations, snapshots, video, rolling buffer, retention and review; each uses a separate user account on a separate PHYSICAL camera device. No OBS, virtual/fake device flags, prerecorded camera source or copying a single sensor into five tracks.
+2. Two consenting adults (or one operator + one participant) sign off notice covering camera, AI observations, snapshots, video, rolling buffer, retention and review; each uses a separate user account on a separate PHYSICAL camera SOURCE (built-in BisonCam; live iPhone via e2eSoft iVCam). No OBS, loopback, fake device flags, prerecorded source or reusing one sensor for both publishers.
 3. Each browser allows real camera permission, sees preview, completes server preflight and starts the Attempt. Verify video-only publication and live teacher authorization.
-4. At ONE timestamp, teacher sees five LIVE subscribed tiles with decoded frames; record anonymized publisher identity, distinct deviceId SHA-256 pseudonym, trackSid, connectedAt, disconnectedAt, measured FPS, number decoded frames and teacher-grid screenshot. All five camera lifetimes must enclose the SAME teacher grid observedAt.
+4. At ONE timestamp, teacher sees TWO LIVE subscribed tiles with decoded frames; record anonymized publisher identity, distinct deviceId SHA-256 pseudonym, trackSid, connectedAt, disconnectedAt, measured FPS, number decoded frames and teacher-grid screenshot. Both camera lifetimes must enclose the SAME teacher grid observedAt.
 5. A separate adult reviewer witnesses (a) the iPhone physically streaming into iVCam (live scene + iVCam watermark) and (b) the built-in camera as a distinct sensor. Never upload serials, labels or faces.
 6. Capture anonymized WebRTC stats, SFU CPU/RAM/bandwidth, Chrome getStats samples, frontend/Backend timings and measured reconnect latencies. Do not mistake frames published for frames actually decoded by the teacher.
 
@@ -88,6 +88,6 @@ python -m unittest discover -s scripts -p 'test_p4f_gate.py' -v
 
 This validator checks declared *distinctness, temporal overlap, evidence completeness and no mocks*. It cannot prove physical sensors, actually inspect referenced files, attest to consent, validate legal rights or execute a media test. Independent reviewer MUST inspect the private evidence and witness devices.
 
-**GO** only with five witnessed simultaneous physical webcams; real model phone/multiple-person alerts; actual private snapshot, clip, video ON/OFF; recorded faults without data loss; security/access negatives; retention/purge; exact-head green tests/CI, independent P0/P1/P2-free review, and an explicit disposition of still-open architecture/worker issue #88. Ten cameras, 30/50/100 scaling and formal commercial rollout are non-goals.
+**GO** only with two witnessed simultaneous physical-SOURCE cameras (BisonCam + live iPhone/iVCam per the 2026-11-18 amendment) plus the separately-labeled five-SIMULATED-publisher benchmark; real model phone/multiple-person alerts; actual private snapshot, clip, video ON/OFF; recorded faults without data loss; security/access negatives; retention/purge; exact-head green tests/CI, independent P0/P1/P2-free review, and an explicit disposition of still-open architecture/worker issue #88. Ten cameras, 30/50/100 scaling and formal commercial rollout are non-goals.
 
 **NO-GO** if only synthetic WebRTC cameras, modeled-only detections, missing private evidence, missing device concurrency, faulty access controls, P0/P1/P2 or unresolved owner policy blockers. Do not close Epic #77, merge feature PRs or deploy without the actual gate and separate Product Owner approval.

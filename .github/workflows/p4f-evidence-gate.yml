@@ -35,5 +35,5 @@ jobs:
       - name: Explain hardware limit
         run: |
           echo "This CI tests manifest validation logic ONLY."
-          echo "P4-F #98 requires 5 distinct physical webcams simultaneously."
+          echo "P4-F #98 (amendment 2026-11-18) requires 2 physical-SOURCE cameras + a separate 5-simulated benchmark."
           echo "NO physical-camera, AI-accuracy, consent, Egress, S3 or outage PASS is implied."
