@@ -8,7 +8,7 @@
 |---|---|---|---|
 | Backend | [#30](https://github.com/hhtuann/Quizopia_Backend/pull/30) | `4eba11eef13b6b128f5d6e6a146edfef680a9598` | [SUCCESS — Backend CI](https://github.com/hhtuann/Quizopia_Backend/actions/runs/44231002668) |
 | Frontend | [#31](https://github.com/hhtuann/Quizopia_Frontend/pull/31) | `461e17d849792583233b5e18000448d5299c279f` | [SUCCESS — Frontend CI](https://github.com/hhtuann/Quizopia_Frontend/actions/runs/44231941767) |
-| System | [#110](https://github.com/hhtuann/Quizopia_System/pull/110) (supersedes #109, closed unmerged) | `5d722ee6ce2818a865045e3edc804ca3255d85cf` | [SUCCESS — Evidence CI](https://github.com/hhtuann/Quizopia_System/actions/runs/44232160082) · [SUCCESS — Pages](https://github.com/hhtuann/Quizopia_System/actions/runs/44232160204) |
+| System | [#110](https://github.com/hhtuann/Quizopia_System/pull/110) (supersedes #109; GitHub records #109 as MERGED — its head `b823b51` entered main as an ancestor of `5d722ee`) | `5d722ee6ce2818a865045e3edc804ca3255d85cf` | [SUCCESS — Evidence CI](https://github.com/hhtuann/Quizopia_System/actions/runs/44232160082) · [SUCCESS — Pages](https://github.com/hhtuann/Quizopia_System/actions/runs/44232160204) |
 
 System merged-main gitlinks at `5d722ee` point to the merged Backend/Frontend **main** SHAs above (verified by the owner at closure; see commit `21cba4c`). No manual deployment was performed.
 
