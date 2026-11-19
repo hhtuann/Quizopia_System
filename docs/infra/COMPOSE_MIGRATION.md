@@ -65,14 +65,18 @@ Run from the System repo root. NEVER use `docker compose down -v` at any point.
    ```
 
    **Post-upgrade (PR #118 deleted `docker-compose.livekit.yml` from the
-   repo):** recover the file from git history into a scratch name and stop
-   with that — or remove the project's containers directly:
+   repo):** recover the exact original definition with `git checkout` rather
+   than `git show ... > file` — Windows PowerShell 5.1's `>` redirection
+   writes UTF-16, which several Docker Compose versions cannot parse (current
+   builds may transcode it, but do not rely on that); `git checkout` writes
+   the blob's bytes verbatim on every setup. Alternative: remove the
+   project's containers directly.
 
    ```powershell
-   # Option A: exact original definition
-   git show <pre-consolidation-commit>:docker-compose.livekit.yml > .legacy-livekit.compose.yml
-   docker compose -p quizopia-media -f .legacy-livekit.compose.yml --profile egress down
-   Remove-Item .legacy-livekit.compose.yml
+   # Option A: exact original definition, encoding-safe
+   git checkout <pre-consolidation-commit> -- docker-compose.livekit.yml
+   docker compose -p quizopia-media -f docker-compose.livekit.yml --profile egress down
+   git rm -qf docker-compose.livekit.yml   # drop the scratch copy (index + worktree)
 
    # Option B: no compose file needed (containers + network only)
    docker ps -aq --filter 'label=com.docker.compose.project=quizopia-media' | ForEach-Object { docker rm -f $_ }
