@@ -1,3 +1,19 @@
+# Quizopia — ONE authoritative Compose stack for local development and demos.
+#
+#   Core (frontend/backend/postgres/redis/minio/mailpit):
+#     docker compose up -d --build
+#   + LiveKit camera monitoring:
+#     docker compose --profile monitoring up -d --build
+#   + monitoring AND recording (egress):
+#     docker compose --profile monitoring --profile recording up -d --build
+#
+# Helper scripts: scripts/start-demo.ps1 | stop-demo.ps1 | status-demo.ps1
+#
+# `name:` is pinned so volume identity is independent of the checkout
+# directory: quizopia-system_postgres_data / _redis_data / _minio_data.
+# NEVER run `docker compose down -v` here — it deletes persistent data.
+name: quizopia-system
+
 services:
   postgres-db:
     image: postgres:17
@@ -73,14 +89,21 @@ services:
       QUIZOPIA_OAUTH_FRONTEND_REDIRECT_URL: ${QUIZOPIA_OAUTH_FRONTEND_REDIRECT_URL:-http://localhost:3000/auth/callback}
       QUIZOPIA_OAUTH_REDIRECT_BASE_URI: ${QUIZOPIA_OAUTH_REDIRECT_BASE_URI:-http://localhost:8080}
       # P4 monitoring / LiveKit / evidence (feature flags remain OFF by default).
+      # RoomService (server->SFU) uses the Docker service DNS name; the
+      # browser-facing WS URL must stay a host-reachable address (localhost).
       QUIZOPIA_AI_INGEST_KEY: ${QUIZOPIA_AI_INGEST_KEY:-}
       QUIZOPIA_LIVEKIT_ENABLED: ${QUIZOPIA_LIVEKIT_ENABLED:-false}
       QUIZOPIA_LIVEKIT_API_KEY: ${QUIZOPIA_LIVEKIT_API_KEY:-devquizopia}
       QUIZOPIA_LIVEKIT_API_SECRET: ${QUIZOPIA_LIVEKIT_API_SECRET:-}
-      QUIZOPIA_LIVEKIT_HTTP_URL: ${QUIZOPIA_LIVEKIT_HTTP_URL:-http://host.docker.internal:7880}
+      QUIZOPIA_LIVEKIT_HTTP_URL: ${QUIZOPIA_LIVEKIT_HTTP_URL:-http://livekit:7880}
       QUIZOPIA_LIVEKIT_WS_URL: ${QUIZOPIA_LIVEKIT_WS_URL:-ws://localhost:7880}
       QUIZOPIA_EVIDENCE_MINIO_ENDPOINT: ${QUIZOPIA_EVIDENCE_MINIO_ENDPOINT:-http://minio:9000}
-      QUIZOPIA_EVIDENCE_MINIO_EGRESS_ENDPOINT: ${QUIZOPIA_EVIDENCE_MINIO_EGRESS_ENDPOINT:-http://host.docker.internal:9000}
+      # S3 endpoint handed to the EGRESS CONTAINER inside recording requests
+      # (same network -> service DNS name, not host.docker.internal).
+      QUIZOPIA_EVIDENCE_MINIO_EGRESS_ENDPOINT: ${QUIZOPIA_EVIDENCE_MINIO_EGRESS_ENDPOINT:-http://minio:9000}
+      # Browser-reachable base for presigned playback URLs (teacher video):
+      # host-published MinIO port, never the Docker-internal hostname.
+      QUIZOPIA_EVIDENCE_MINIO_PUBLIC_ENDPOINT: ${QUIZOPIA_EVIDENCE_MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
       QUIZOPIA_EVIDENCE_MINIO_ACCESS_KEY: ${QUIZOPIA_EVIDENCE_MINIO_ACCESS_KEY:-}
       QUIZOPIA_EVIDENCE_MINIO_SECRET_KEY: ${QUIZOPIA_EVIDENCE_MINIO_SECRET_KEY:-}
       QUIZOPIA_EVIDENCE_BUCKET: ${QUIZOPIA_EVIDENCE_BUCKET:-quizopia-evidence}
@@ -98,10 +121,13 @@ services:
         condition: service_healthy
       redis-cache:
         condition: service_started
+      minio:
+        condition: service_healthy
 
     networks:
       - quizopia_network
-    # For P4 LiveKit when it is running on the Docker host / separate stack.
+    # Kept for host-run tooling / E2E workflows that address the host from
+    # containers (LiveKit itself now lives in this stack, service DNS "livekit").
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -129,15 +155,18 @@ services:
       - quizopia_network
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: quizopia_minio
     restart: unless-stopped
 
     command: server /data --console-address ":9001"
 
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin123
+      # Root credentials double as the dev evidence-bucket credentials in
+      # .env (QUIZOPIA_EVIDENCE_MINIO_*). Keeping them in .env preserves the
+      # credentials of an EXISTING minio_data volume across recreations.
+      MINIO_ROOT_USER: ${QUIZOPIA_MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${QUIZOPIA_MINIO_ROOT_PASSWORD:-minioadmin123}
 
     ports:
       - "9000:9000"
@@ -148,7 +177,6 @@ services:
 
     networks:
       - quizopia_network
-
     healthcheck:
       test: [ "CMD-SHELL", "mc ready local" ]
       interval: 10s
@@ -158,12 +186,127 @@ services:
   mailpit:
     image: axllent/mailpit:latest
     container_name: quizopia_mailpit
-    restart: unless-stopped
-
     ports:
       - "8025:8025"
       - "1025:1025"
 
+    networks:
+      - quizopia_network
+
+  # ------------------------------------------------------------------
+  # Camera monitoring profile (Phase 4). Start with --profile monitoring.
+  # Replaces the former standalone docker-compose.livekit.yml stack.
+  # ------------------------------------------------------------------
+  livekit-redis:
+    image: redis:7-alpine
+    container_name: quizopia_livekit_redis
+    restart: unless-stopped
+    # Also in the "recording" profile: recording requires the SFU + its
+    # redis, so `--profile recording` alone activates them too.
+    profiles: ["monitoring", "recording"]
+    # Orchestration-only store (room state, not application data); in-memory
+    # on purpose. Kept SEPARATE from the application redis-cache.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - quizopia_network
+
+  livekit:
+    image: livekit/livekit-server:v1.9
+    container_name: quizopia_livekit
+    restart: unless-stopped
+    profiles: ["monitoring", "recording"]
+    # livekit-server does NOT expand ${...} in its YAML config; render the
+    # infra/livekit/livekit.yaml template with the process env at launch.
+    # The secret never enters the command line (env + container-local /tmp).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        test -n "$$LIVEKIT_API_SECRET" || { echo 'ERROR: QUIZOPIA_LIVEKIT_API_SECRET is empty. Set it in the System root .env (see .env.example) before starting the monitoring profile.'; exit 1; }
+        sed -e "s|\$${LIVEKIT_API_KEY}|$$LIVEKIT_API_KEY|" \
+            -e "s|\$${LIVEKIT_API_SECRET}|$$LIVEKIT_API_SECRET|" \
+            -e "s|\$${LIVEKIT_WEBHOOK_URL}|$$LIVEKIT_WEBHOOK_URL|" \
+            -e "s|\$${LIVEKIT_RTC_NODE_IP}|$$LIVEKIT_RTC_NODE_IP|" \
+            -e "s|\$${LIVEKIT_RTC_PORT_START}|$$LIVEKIT_RTC_PORT_START|" \
+            -e "s|\$${LIVEKIT_RTC_PORT_END}|$$LIVEKIT_RTC_PORT_END|" \
+            /etc/livekit/livekit.yaml > /tmp/livekit.yaml
+        exec /livekit-server --config /tmp/livekit.yaml
+    ports:
+      - "7880:7880" # HTTP/WSS signaling (browsers + Twirp RoomService)
+      - "7881:7881" # WebRTC over TCP fallback
+      - "3478:3478/udp" # embedded TURN (UDP)
+      # WebRTC ICE/UDP media range (rtc.port_range). Config + published ports
+      # move together via LIVEKIT_RTC_PORT_START/END — needed on Windows when
+      # Hyper-V dynamic exclusions cover the default range.
+      - "${LIVEKIT_RTC_PORT_START:-50100}-${LIVEKIT_RTC_PORT_END:-50200}:${LIVEKIT_RTC_PORT_START:-50100}-${LIVEKIT_RTC_PORT_END:-50200}/udp"
+    environment:
+      # Same credential pair the backend uses (QUIZOPIA_LIVEKIT_API_KEY /
+      # _API_SECRET in the root .env) — key/secret must match the backend.
+      LIVEKIT_API_KEY: ${QUIZOPIA_LIVEKIT_API_KEY:-devquizopia}
+      LIVEKIT_API_SECRET: ${QUIZOPIA_LIVEKIT_API_SECRET:-}
+      # Signed webhook target: backend service inside this network by
+      # default; use http://host.docker.internal:8080/... when the backend
+      # runs directly on the host (E2E workflows).
+      LIVEKIT_WEBHOOK_URL: ${LIVEKIT_WEBHOOK_URL:-http://backend:8080/internal/media/v1/livekit/webhooks}
+      # ICE candidates advertise loopback for browsers on the Docker host;
+      # set the host LAN IP here for LAN demos (README "LAN demo").
+      LIVEKIT_RTC_NODE_IP: ${LIVEKIT_RTC_NODE_IP:-127.0.0.1}
+      LIVEKIT_RTC_PORT_START: ${LIVEKIT_RTC_PORT_START:-50100}
+      LIVEKIT_RTC_PORT_END: ${LIVEKIT_RTC_PORT_END:-50200}
+    volumes:
+      - ./infra/livekit/livekit.yaml:/etc/livekit/livekit.yaml:ro
+    depends_on:
+      livekit-redis:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:7880"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - quizopia_network
+
+  # ------------------------------------------------------------------
+  # Recording profile (Phase 4 P4-D). Start with
+  # --profile monitoring --profile recording.
+  # Storage destination arrives per request from the backend (MinIO/S3);
+  # this service only needs LiveKit credentials + redis + SFU connectivity.
+  # ------------------------------------------------------------------
+  egress:
+    image: livekit/egress:v1.9
+    container_name: quizopia_livekit_egress
+    restart: unless-stopped
+    profiles: ["recording"]
+    # Like the SFU above: egress does NOT expand ${...} in its YAML config,
+    # so render the template with the process env at launch.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        test -n "$$LK_API_SECRET" || { echo 'ERROR: QUIZOPIA_LIVEKIT_API_SECRET is empty. Set it in the System root .env (see .env.example) before starting the recording profile.'; exit 1; }
+        sed -e "s|\$${LIVEKIT_API_KEY}|$$LK_API_KEY|" \
+            -e "s|\$${LIVEKIT_API_SECRET}|$$LK_API_SECRET|" \
+            /etc/livekit/egress.yaml > /tmp/egress.yaml
+        exec /usr/bin/egress --config /tmp/egress.yaml
+    environment:
+      # Egress reads the same API key/secret pair as the SFU and backend.
+      LK_API_KEY: ${QUIZOPIA_LIVEKIT_API_KEY:-devquizopia}
+      LK_API_SECRET: ${QUIZOPIA_LIVEKIT_API_SECRET:-}
+      E_CONFIG_FILE: /tmp/egress.yaml
+    volumes:
+      - ./infra/livekit/egress.yaml:/etc/livekit/egress.yaml:ro
+    depends_on:
+      livekit-redis:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+      minio:
+        condition: service_healthy
     networks:
       - quizopia_network
 

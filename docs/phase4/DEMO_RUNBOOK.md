@@ -12,16 +12,33 @@ Prerequisites: Docker Desktop, Java 21, Maven wrapper, Node/npm, Chromium, Playw
 
 ## 2. Start real local services
 
-From System root (PowerShell; secrets in gitignored .env.livekit, never in Git):
+From System root (PowerShell; secrets in the gitignored root `.env`
+`QUIZOPIA_LIVEKIT_API_KEY/_API_SECRET`, never in Git — one credential pair
+for backend + SFU + Egress):
 
 ~~~powershell
-docker compose up -d
-docker compose --env-file .env.livekit -f docker-compose.livekit.yml --profile egress up -d
-docker compose ps
+docker compose --profile monitoring --profile recording up -d --build
+docker compose --profile monitoring --profile recording ps
 curl.exe http://localhost:7880
 ~~~
 
-For host-run backend/Next use the matching environment in [infra/livekit/README.md](../../infra/livekit/README.md) and [P4-D reproducibility](https://github.com/hhtuann/Quizopia_Frontend/blob/main/e2e/P4D-REPRODUCIBILITY.md): Backend LIVEKIT enabled, credentials matching .env.livekit, RoomService localhost:7880, WebSocket address reachable by EVERY physical client, private MinIO credentials and valid Egress storage endpoint. Other laptops accessing a LAN URL will generally need HTTPS/TLS for getUserMedia; localhost on the server is NOT reachable as localhost from other devices. Test TURN/ICE UDP and firewall routes. Never expose dev secrets or MinIO publicly.
+(`--profile monitoring` alone starts camera monitoring without Egress;
+plain `docker compose up -d --build` starts only the core stack. Helper
+scripts: `.\scripts\start-demo.ps1 -Mode recording`, `.\scripts\status-demo.ps1`,
+`.\scripts\stop-demo.ps1`. The former standalone `docker-compose.livekit.yml`
+stack was consolidated — see docs/infra/COMPOSE_MIGRATION.md.)
+
+For host-run backend/Next (E2E workflows) point `QUIZOPIA_LIVEKIT_HTTP_URL`
+and `LIVEKIT_WEBHOOK_URL` at `localhost`/`host.docker.internal` respectively
+([infra/livekit/README.md](../../infra/livekit/README.md)) and
+[P4-D reproducibility](https://github.com/hhtuann/Quizopia_Frontend/blob/main/e2e/P4D-REPRODUCIBILITY.md):
+Backend LIVEKIT enabled, credentials matching the root `.env` pair, RoomService
+`http://livekit:7880` (in-stack) or `localhost:7880` (host-run), WebSocket
+address reachable by EVERY physical client, private MinIO credentials and the
+in-network Egress storage endpoint `http://minio:9000`. Other laptops
+accessing a LAN URL will generally need HTTPS/TLS for getUserMedia; localhost
+on the server is NOT reachable as localhost from other devices. Test TURN/ICE
+UDP and firewall routes. Never expose dev secrets or MinIO publicly.
 
 ### Existing regression commands (SYNTHETIC browser camera suite)
 
